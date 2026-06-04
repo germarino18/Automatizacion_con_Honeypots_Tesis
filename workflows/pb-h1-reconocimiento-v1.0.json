@@ -1,0 +1,458 @@
+{
+  "name": "PB-H1 - Reconocimiento y Escaneo (T1595/T1046)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "cowrie",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "webhook-cowrie",
+      "name": "Webhook Cowrie",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "cowrie-webhook-001"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Normalizar datos del honeypot\nconst event = $input.all()[0].json;\n\nreturn {\n  timestamp: event.timestamp || new Date().toISOString(),\n  source_honeypot: 'cowrie',\n  src_ip: event.src_ip || event.source_ip,\n  dst_port: event.dst_port || event.port,\n  session_id: event.session || event.session_id,\n  commands: event.input || event.command || '',\n  event_type: event.event || 'connection',\n  playbook_id: 'PB-H1-v1.0',\n  att_ck_technique: event.dst_port === 2222 ? 'T1595' : 'T1046'\n};"
+      },
+      "id": "function-normalize",
+      "name": "Normalizar Datos",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.abuseipdb.com/api/v2/check",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "ipAddress",
+              "value": "={{ $json[\"src_ip\"] }}"
+            },
+            {
+              "name": "maxAgeInDays",
+              "value": "90"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Key",
+              "value": "={{ $credentials[\"AbuseIPDB_API\"][\"apiKey\"] }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "http-abuseipdb",
+      "name": "AbuseIPDB Lookup",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [650, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "abuseipdb-cred-001",
+          "name": "AbuseIPDB_API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.shodan.io/shodan/host/{{ $json[\"src_ip\"] }}",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key",
+              "value": "={{ $credentials[\"Shodan_API\"][\"apiKey\"] }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "http-shodan",
+      "name": "Shodan Lookup",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [850, 300],
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "shodan-cred-001",
+          "name": "Shodan_API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Calcular score de riesgo\nconst abuseData = $input.all()[1].json.data || {};\nconst shodanData = $input.all()[2].json || {};\n\nlet score = 0;\n\n// Score por reputación AbuseIPDB\nconst abuseScore = abuseData.abuseConfidenceScore || 0;\nif (abuseScore > 50) score += 0.3;\nif (abuseScore > 80) score += 0.2;\n\n// Score por tipo de organización (hosting/cloud = más riesgoso)\nconst org = shodanData.org || '';\nif (org.toLowerCase().includes('hosting') || org.toLowerCase().includes('cloud')) {\n  score += 0.2;\n}\n\n// Score por múltiples puertos escaneados\nconst openPorts = shodanData.ports || [];\nif (openPorts.length > 5) score += 0.2;\n\n// Score por vulnerabilidades conocidas\nconst vulns = shodanData.vulns || [];\nif (vulns.length > 0) score += 0.2;\n\n// Normalizar score entre 0 y 1\nscore = Math.min(score, 1.0);\n\nreturn {\n  ...$input.all()[0].json,\n  risk_score: score,\n  abuse_confidence: abuseScore,\n  organization: org,\n  open_ports_count: openPorts.length,\n  has_vulns: vulns.length > 0,\n  enrichment_timestamp: new Date().toISOString()\n};"
+      },
+      "id": "function-scoring",
+      "name": "Calcular Risk Score",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json[\"risk_score\"] }}",
+              "operation": "greaterEqual",
+              "value2": "0.8"
+            }
+          ]
+        }
+      },
+      "id": "switch-high-risk",
+      "name": "¿Riesgo Alto? (≥0.8)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json[\"risk_score\"] }}",
+              "operation": "greaterEqual",
+              "value2": "0.5"
+            },
+            {
+              "value1": "={{ $json[\"risk_score\"] }}",
+              "operation": "smaller",
+              "value2": "0.8"
+            }
+          ]
+        }
+      },
+      "id": "switch-medium-risk",
+      "name": "¿Riesgo Medio? (0.5-0.79)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1450, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.your-firewall.com/api/v1/block",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "ip",
+              "value": "={{ $json[\"src_ip\"] }}"
+            },
+            {
+              "name": "duration",
+              "value": "3600"
+            },
+            {
+              "name": "reason",
+              "value": "Honeypot reconnaissance - PB-H1"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "http-firewall-block",
+      "name": "Bloqueo Firewall",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [1650, 200],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "firewall-cred-001",
+          "name": "Firewall_API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://slack.com/api/chat.postMessage",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "channel",
+              "value": "#soc-alerts"
+            },
+            {
+              "name": "text",
+              "value": "🚨 ALERTA CRÍTICA - Honeypot\n\nIP: {{ $json[\"src_ip\"] }}\nScore: {{ $json[\"risk_score\"] }}\nTécnica: {{ $json[\"att_ck_technique\"] }}\nAcción: Bloqueo automático aplicado"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "slack-critical",
+      "name": "Slack Alerta Crítica",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [1850, 200],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "slack-cred-001",
+          "name": "Slack_API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "waitTime": 1,
+        "waitUnit": "hours",
+        "options": {}
+      },
+      "id": "wait-approval",
+      "name": "Esperar Aprobación Humana",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [1650, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://your-glpi-instance.com/apirest.php/Ticket",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "input",
+              "value": "={\"name\": \"Honeypot Alert - {{ $json[\"src_ip\"] }}\", \"content\": \"IP: {{ $json[\"src_ip\"] }}\\nScore: {{ $json[\"risk_score\"] }}\\nTécnica ATT&CK: {{ $json[\"att_ck_technique\"] }}\", \"urgency\": \"3\"}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "glpi-ticket",
+      "name": "Crear Ticket GLPI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [1850, 400],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "glpi-cred-001",
+          "name": "GLPI_API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO honeypot_events (timestamp, source_honeypot, src_ip, dst_port, commands, playbook_id, risk_score, att_ck_technique, enrichment_data) VALUES ('{{ $json[\"timestamp\"] }}', '{{ $json[\"source_honeypot\"] }}', '{{ $json[\"src_ip\"] }}', {{ $json[\"dst_port\"] }}, '{{ $json[\"commands\"] }}', '{{ $json[\"playbook_id\"] }}', {{ $json[\"risk_score\"] }}, '{{ $json[\"att_ck_technique\"] }}', '{{ $json[\"enrichment_timestamp\"] }}'::jsonb);",
+        "options": {}
+      },
+      "id": "postgres-audit",
+      "name": "PostgreSQL Auditoría",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [2050, 300],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-cred-001",
+          "name": "PostgreSQL_Audit"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"status\": \"processed\", \"event_id\": \"{{ $json[\"src_ip\"] }}-{{ $json[\"timestamp\"] }}\"}",
+        "options": {}
+      },
+      "id": "respond-webhook",
+      "name": "Responder Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [2250, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Cowrie": {
+      "main": [
+        [
+          {
+            "node": "Normalizar Datos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar Datos": {
+      "main": [
+        [
+          {
+            "node": "AbuseIPDB Lookup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AbuseIPDB Lookup": {
+      "main": [
+        [
+          {
+            "node": "Shodan Lookup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shodan Lookup": {
+      "main": [
+        [
+          {
+            "node": "Calcular Risk Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calcular Risk Score": {
+      "main": [
+        [
+          {
+            "node": "¿Riesgo Alto? (≥0.8)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Riesgo Alto? (≥0.8)": {
+      "main": [
+        [
+          {
+            "node": "Bloqueo Firewall",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "¿Riesgo Medio? (0.5-0.79)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Riesgo Medio? (0.5-0.79)": {
+      "main": [
+        [
+          {
+            "node": "Esperar Aprobación Humana",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "PostgreSQL Auditoría",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bloqueo Firewall": {
+      "main": [
+        [
+          {
+            "node": "Slack Alerta Crítica",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack Alerta Crítica": {
+      "main": [
+        [
+          {
+            "node": "PostgreSQL Auditoría",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Esperar Aprobación Humana": {
+      "main": [
+        [
+          {
+            "node": "Crear Ticket GLPI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Crear Ticket GLPI": {
+      "main": [
+        [
+          {
+            "node": "PostgreSQL Auditoría",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PostgreSQL Auditoría": {
+      "main": [
+        [
+          {
+            "node": "Responder Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "pb-h1-v1.0-20260301",
+  "meta": {
+    "instanceId": "honeypot-soc-n8n",
+    "templateCredsSetupCompleted": true
+  },
+  "tags": [
+    {
+      "name": "PB-H1"
+    },
+    {
+      "name": "Reconocimiento"
+    },
+    {
+      "name": "T1595"
+    },
+    {
+      "name": "T1046"
+    }
+  ]
+}
