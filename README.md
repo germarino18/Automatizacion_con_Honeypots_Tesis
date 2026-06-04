@@ -62,8 +62,8 @@ Componentes principales:
 ### Clonar repositorio
 
 ```bash
-git clone https://github.com/navanacho/Automaticacion_n8n_honeypots.git
-cd Automaticacion_n8n_honeypots
+git clone https://github.com/germarino18/Automatizacion_con_Honeypots_Tesis
+cd Automatizacion_con_Honeypots_Tesis
 ```
 
 ### Levantar servicios
