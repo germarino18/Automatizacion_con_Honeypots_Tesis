@@ -1,0 +1,35 @@
+# ===========================================
+# .gitignore - Honeypot SOC
+# ===========================================
+
+# ---------- Variables de Entorno ----------
+.env
+.env.local
+.env.*.local
+
+# ---------- Datos de Servicios (volúmenes) ----------
+postgres/data/
+n8n/data/
+grafana/
+
+# ---------- Logs de Honeypots ----------
+cowrie/logs/
+cowrie/downloads/
+dionaea/logs/
+dionaea/binaries/
+
+# ---------- Certificados ----------
+nginx/certs/
+
+# ---------- Node / npm ----------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ---------- Sistema ----------
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~

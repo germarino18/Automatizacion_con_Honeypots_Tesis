@@ -1,0 +1,179 @@
+# ===========================================
+# DOCKER COMPOSE - HONEYPOT SOC
+# Tesis: Automatización con Honeypots
+# Versión: 1.0.0
+# ===========================================
+
+services:
+  # -------------------------------------------
+  # 1. BASE DE DATOS (PostgreSQL)
+  # -------------------------------------------
+  postgres:
+    image: postgres:15-alpine
+    container_name: soc-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - ./postgres/data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - red_interna
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # -------------------------------------------
+  # 2. ORQUESTADOR (n8n)
+  # -------------------------------------------
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: soc-n8n
+    environment:
+      # Autenticación
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD}
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      - WEBHOOK_URL=${WEBHOOK_URL}
+      # Base de datos (PostgreSQL como backend)
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_USER=${POSTGRES_USER}
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB}
+      # Configuración
+      - N8N_USER_FOLDER=/home/node/.n8n
+      - N8N_METRICS=false
+      - N8N_PAYLOAD_SIZE_MAX=16
+    volumes:
+      - ./n8n/data:/home/node/.n8n
+    ports:
+      - "5678:5678"
+    networks:
+      - red_interna
+      - red_dmz
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:5678/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # -------------------------------------------
+  # 3. HONEYPOT SSH (Cowrie)
+  # -------------------------------------------
+  cowrie:
+    image: cowrie/cowrie:latest
+    container_name: soc-cowrie
+    environment:
+      - COWRIE_SSH_PORT=${COWRIE_SSH_PORT}
+      - COWRIE_TELNET_PORT=${COWRIE_TELNET_PORT}
+      - COWRIE_OUTPUT_ENDPOINT=http://n8n:5678/webhook/cowrie
+    volumes:
+      - ./cowrie/config:/cowrie/cowrie-git/etc
+      - ./cowrie/logs:/cowrie/cowrie-git/log
+      - ./cowrie/downloads:/cowrie/cowrie-git/dl
+    ports:
+      - "${COWRIE_SSH_PORT}:2222"
+      - "${COWRIE_TELNET_PORT}:2223"
+    networks:
+      - red_dmz
+      - red_interna
+    depends_on:
+      n8n:
+        condition: service_started
+    restart: unless-stopped
+
+  # -------------------------------------------
+  # 4. HONEYPOT MALWARE (Dionaea)
+  # -------------------------------------------
+  dionaea:
+    image: dinotools/dionaea:latest
+    container_name: soc-dionaea
+    environment:
+      - DIONAEA_OUTPUT_ENDPOINT=http://n8n:5678/webhook/dionaea
+    volumes:
+      - ./dionaea/config:/opt/dionaea/etc
+      - ./dionaea/logs:/opt/dionaea/var/log
+      - ./dionaea/binaries:/opt/dionaea/var/dionaea/binaries
+    ports:
+      - "${DIONAEA_SMB_PORT}:445"
+      - "${DIONAEA_FTP_PORT}:21"
+      - "${DIONAEA_HTTP_PORT}:80"
+    networks:
+      - red_dmz
+      - red_interna
+    depends_on:
+      n8n:
+        condition: service_started
+    restart: unless-stopped
+
+  # -------------------------------------------
+  # 5. VISUALIZACIÓN (Grafana)
+  # -------------------------------------------
+  grafana:
+    image: grafana/grafana:latest
+    container_name: soc-grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_SERVER_ROOT_URL=http://localhost:3000
+    volumes:
+      - ./grafana:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    networks:
+      - red_interna
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # -------------------------------------------
+  # 6. PROXY REVERSO (Nginx)
+  # -------------------------------------------
+  nginx:
+    image: nginx:alpine
+    container_name: soc-nginx
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - red_interna
+      - red_dmz
+    depends_on:
+      - n8n
+    restart: unless-stopped
+
+# ===========================================
+# REDES
+# ===========================================
+networks:
+  red_dmz:
+    name: honeypot_dmz
+    driver: bridge
+    ipam:
+      config:
+        - subnet: ${NETWORK_DMZ_SUBNET}
+
+  red_interna:
+    name: honeypot_internal
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: ${NETWORK_INTERNAL_SUBNET}
