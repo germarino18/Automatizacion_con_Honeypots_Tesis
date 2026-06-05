@@ -18,6 +18,7 @@ cowrie/downloads/
 dionaea/logs/
 dionaea/binaries/
 dionaea/config/dionaea/ihandlers-enabled/
+dionaea/config/dionaea/services-enabled/
 
 # ---------- Certificados ----------
 nginx/certs/
