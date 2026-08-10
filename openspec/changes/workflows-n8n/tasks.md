@@ -35,3 +35,16 @@
 - [ ] 5.3 Confirmar que los datos aparecen en la tabla `honeypot_events` de PostgreSQL (fuente cowrie, con `raw_data`)
 - [ ] 5.4 Verificar persistencia: reiniciar n8n y confirmar que los workflows sigan activos
 - [ ] 5.5 Confirmar que NO quedan workflows duplicados en la ruta `/webhook/cowrie` (solo PB-H1 activo)
+
+## 6. Sidecar unificado (Camino B) — emisión de eventos a n8n
+
+> **Prerrequisito verificado:** Cowrie (3.0.12) NO tiene módulo de output HTTP; `COWRIE_OUTPUT_ENDPOINT` es código muerto. La emisión la hace este sidecar (absorbe el futuro "puente Dionaea").
+
+- [ ] 6.1 Crear la estructura del servicio sidecar (`sidecar/`): Dockerfile con `python:3-alpine`, requirements, entrypoint minimal
+- [ ] 6.2 Implementar el tailer del jsonlog de Cowrie (`cowrie/logs/cowrie.json`) con manejo de rotación/recreación del archivo (TDD: unit tests)
+- [ ] 6.3 Implementar el POST normalizado a `http://n8n:5678/webhook/cowrie` con retries + backoff y cola en memoria, sin pérdida de eventos (TDD: unit tests)
+- [ ] 6.4 Configurar el overlay de Cowrie: `cowrie/config/cowrie.cfg` con `[output_jsonlog]` `enabled = true` y `logfile = log/cowrie.json` (bind-mount `cowrie/logs`; el jsonlog sale del volumen anónimo)
+- [ ] 6.5 Agregar el servicio sidecar a `docker-compose.yml`: redes `red_dmz` + `red_interna`, mounts `cowrie/logs` + `dionaea/logs` (solo lectura), env vars `COWRIE_JSONLOG_PATH`, `N8N_COWRIE_URL`, `N8N_DIONAEA_URL`
+- [ ] 6.6 Implementar la fuente dionaea (lectura `dionaea.json` → POST a `http://n8n:5678/webhook/dionaea`, `source_honeypot='dionaea'`) — **preparada pero dormante**: si `dionaea.json` no existe, el sidecar arranca igual con solo cowrie
+- [ ] 6.7 Habilitar servicios de Dionaea e ihandler `log_json` (`services-enabled/` + `ihandlers-enabled/`) — **fase posterior, no bloquea este change** (fuente dormante)
+- [ ] 6.8 Verificar end-to-end: login simulado en Cowrie → sidecar → n8n (PB-H1) → fila nueva en `honeypot_events` con `source_honeypot='cowrie'` y `raw_data`

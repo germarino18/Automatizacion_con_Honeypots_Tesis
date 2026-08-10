@@ -12,11 +12,14 @@ Necesitamos:
 1. Un esquema de base de datos para almacenar eventos de ataque
 2. Workflows de n8n que reciban los webhooks y persistan los datos
 3. Que los workflows sean versionables (archivos importables, no solo desde la UI)
+4. Un **sidecar unificado** (contenedor Python nuevo) que lea los logs de ambos honeypots y los reenvíe a n8n — los honeypots NO postean HTTP directo (ver Decisión 6)
 
 ## Goals / Non-Goals
 
 **Goals:**
 - Usar la tabla existente `honeypot_events` (16 columnas, creada por `init.sql`) — NO crear DDL en los workflows
+- **Emisión (Camino B)**: construir el sidecar unificado que lee el jsonlog de Cowrie → POST a `/webhook/cowrie`; y que DEJE preparada la fuente Dionaea (`dionaea.json` → POST a `/webhook/dionaea`) para activarse en fase posterior
+- **Cowrie (config)**: overlay `cowrie/config/cowrie.cfg` `[output_jsonlog]` `logfile = log/cowrie.json` para que el jsonlog salga del volumen anónimo y sea legible por el sidecar
 - **Cowrie**: usar el playbook PB-H1 existente como receptor en `/webhook/cowrie` (arreglando su SQL) + PB-H2 como sub-workflow para comandos
 - **Dionaea**: crear workflow "Dionaea Webhook" que recibe POST en `/webhook/dionaea` y guarda en BD
 - Exportar los workflows como archivos JSON en el repositorio
@@ -57,11 +60,11 @@ n8n permite exportar/importar workflows como JSON. Los guardamos en el repo para
 
 **Elegido:** Usar el webhook por defecto de n8n (puerto 5678, ruta `/webhook/<nombre>`).
 
-Los honeypots ya apuntan a:
+Los webhooks de n8n (destino de los POST, hoy emitidos por el sidecar — ver Decisión 6) son:
 - Cowrie → `http://n8n:5678/webhook/cowrie`
 - Dionaea → `http://n8n:5678/webhook/dionaea`
 
-No hay que cambiar nada del lado de los honeypots.
+> **Nota Camino B:** las URLs de destino son las mismas, pero quien postea es el sidecar unificado (Decisión 6), no los honeypots directamente.
 
 ### Decisión 4: Estrategia de mapeo de payload → columnas
 
@@ -106,7 +109,7 @@ No hay que cambiar nada del lado de los honeypots.
 
 **Contexto:** El usuario tiene 2 playbooks previos (`C:\Tesis n8n HoneyPots\`) que ya están en el repo (`workflows/`): PB-H1 escucha en `/webhook/cowrie` y PB-H2 en `/webhook/cowrie-command`.
 
-**Problema:** n8n no permite dos workflows ACTIVOS con la misma ruta webhook, y Cowrie manda TODOS sus eventos a una sola URL (`COWRIE_OUTPUT_ENDPOINT=http://n8n:5678/webhook/cowrie`). La ruta `/webhook/cowrie-command` de PB-H2 **nunca recibiría tráfico** — PB-H2 jamás se dispararía en producción.
+**Problema:** n8n no permite dos workflows ACTIVOS con la misma ruta webhook, y todos los eventos de Cowrie llegan a una sola URL (`http://n8n:5678/webhook/cowrie`, emitidos por el sidecar de la Decisión 6; en la anterior asunción se usaba `COWRIE_OUTPUT_ENDPOINT`, verificada como **código muerto** en cowrie 3.0.12). La ruta `/webhook/cowrie-command` de PB-H2 **nunca recibiría tráfico** — PB-H2 jamás se dispararía en producción.
 
 **Elegido:** PB-H1 como receptor único de Cowrie + PB-H2 como **sub-workflow** ejecutado por PB-H1.
 
@@ -123,6 +126,56 @@ Cowrie ──todos los eventos──▶ /webhook/cowrie (PB-H1, receptor)
 - PB-H2: pierde su rol de webhook — se ejecuta vía nodo *Execute Workflow* (sub-workflow). Se puede conservar su nodo Webhook para testing manual, pero **no se activa**.
 - La ruta `/webhook/dionaea` queda libre para el workflow Dionaea nuevo (no había conflictos — no existe ningún playbook para Dionaea).
 
+### Decisión 6: Arquitectura de emisión — sidecar unificado (Camino B)
+
+**Reemplaza la asunción anterior:** en las decisiones previas se asumía que Cowrie enviaba webhooks HTTP directo a n8n. Eso es **FALSO** (verificado en el change archivado `conectar-y-verificar`): la imagen `cowrie/cowrie:latest` (3.0.12) NO tiene el módulo de output `cowrie.output.http` (tiene 36 módulos de output, ninguno http) y la variable `COWRIE_OUTPUT_ENDPOINT` es código muerto. Dionaea tampoco soporta emisión HTTP nativa (`DIONAEA_OUTPUT_ENDPOINT` inexistente).
+
+**Elegido (Camino B):** un **sidecar unificado** (contenedor Python) que lee los logs de AMBOS honeypots y los postea a los webhooks de n8n. Absorbe el futuro "puente Dionaea".
+
+```
+cowrie   (jsonlog → bind-mount cowrie/logs)   ──┐
+                                                 │
+                                                 ├──▶ sidecar (python) ──POST──▶ http://n8n:5678/webhook/cowrie|dionaea ──▶ n8n workflow ──▶ PostgreSQL honeypot_events
+                                                 │
+dionaea  (dionaea.json → bind-mount dionaea/logs) ──┘
+```
+
+**El puente reemplaza la emisión HTTP nativa**: los honeypots escriben logs; el sidecar los lee y los reemite a n8n. Es el único punto que toca red y los webhooks.
+
+**Diseño del sidecar (`soc-sidecar`):**
+- **Nombre sugerido del contenedor:** `soc-sidecar` (alternativa `soc-bridge`)
+- **Imagen:** `python:3-alpine` (o `python:3-slim`) — imagen python mínima, sin depender del contenedor distroless de Cowrie
+- **Redes:** `red_dmz` + `red_interna` — necesita alcanzar el bind-mount de cowrie (en `red_dmz`) Y n8n (en `red_interna`)
+- **Montajes (solo lectura):** volumen/bind-mount `cowrie/logs` (jsonlog) + `dionaea/logs` (dionaea.json)
+- **Env vars:**
+  - `COWRIE_JSONLOG_PATH` → ruta al jsonlog de cowrie (ej: `/logs/cowrie.json`)
+  - `DIONAEA_JSONLOG_PATH` → ruta a `dionaea.json` (opcional en esta fase)
+  - `N8N_COWRIE_URL` → `http://n8n:5678/webhook/cowrie`
+  - `N8N_DIONAEA_URL` → `http://n8n:5678/webhook/dionaea`
+- **Retry strategy:** si n8n está caído, reintenta con backoff (aleatorio/exp/exponencial) y retiene el evento en cola hasta éxito — cowrie escribe al archivo pase lo que pase, el sidecar NO debe perder eventos.
+- **Log rotation:** debe detectar la recreación/re-escritura del archivo (p.ej. truncado o nuevo inode) y re-tail desde el principio de ese archivo nuevo, sin duplicar ni perder líneas.
+- **Payload normalization:** pass-through del event dict + tag `source_honeypot`. Forma canónica:
+  ```json
+  { "source_honeypot": "cowrie", "event": { ...evento cowrie... } }
+  ```
+  Para cowrie, claves canónicas comunes: `session`, `protocol`, `src_ip`, `src_port`, `dst_ip`, `dst_port`, `eventid`, `sensor`, `uuid`, `timestamp`, `message`; por eventid: `login.success` → `username`/`password`; `command.input` → `input`; `client.version` → `version`; `log.closed` → `ttylog`/`size`/`shasum`/`duplicate`/`duration_ms`.
+- **Strip de password (opcional):** el sidecar PUEDE eliminar el campo `password` de `login.success` antes de postear (política de seguridad); en todo caso el workflow de n8n DEBE filtrarlo antes de persistir (ver nota de seguridad).
+- **TDD obligatorio:** el sidecar es código que nosotros escribimos — se debe testar con unit tests (tailer, retry, normalización) antes de integrar.
+
+**Config overlay de Cowrie** (slot oficial de config, hoy vacío): crear `cowrie/config/cowrie.cfg`:
+
+```ini
+[output_jsonlog]
+enabled = true
+logfile = log/cowrie.json
+```
+
+- `cwd` de la imagen es `/cowrie/cowrie-git`, así que `log/cowrie.json` resuelve a `/cowrie/cowrie-git/log/cowrie.json` = **bind-mount `cowrie/logs`** (verificado como usable).
+- Impide que el jsonlog caiga en el volumen anónimo; el sidecar lee desde el bind-mount.
+- Los env vars no pueden crear secciones, por eso se usa el archivo `.cfg` (no `COWRIE_<SECTION>_<OPTION>`).
+
+**Dionaea — fuente preparada / fase posterior:** el sidecar DEBE diseñarse capaz de leer `dionaea.json` y postear a `/webhook/dionaea` (formato de ihandler `log_json` de `dinotools/dionaea`), pero para ESTE change la fuente dionaea está **dormante**: Dionaea sigue inerte por configuración (`services-enabled/` e `ihandlers-enabled/` vacíos → 0 listeners). Habilitar los servicios de Dionaea (y su ihandler `log_json`) es una fase posterior y NO bloquea este change. Con `dionaea.json` ausente, el sidecar arranca igual y solo procesa cowrie.
+
 ## Risks / Trade-offs
 
 | Riesgo | Impacto | Mitigación |
@@ -134,3 +187,9 @@ Cowrie ──todos los eventos──▶ /webhook/cowrie (PB-H1, receptor)
 | La tabla crece rápido sin límite | Bajo | Agregar política de retención (ej: borrar datos > 30 días) cuando sea necesario |
 | Los playbooks PB-H1/PB-H2 tienen SQL con interpolación y cast JSONB inválido | Alto | Migrar a INSERT parametrizado y cast correcto en este change (Decisión 4/5) |
 | PB-H2 queda "huérfano" si el nodo Execute Workflow no se configura bien | Medio | Probar la ruta de comandos con un evento de prueba con `command` (task 4.x) |
+| Cowrie NO emite HTTP nativo — la Decisión 5 asumía webhook directo | Alto | Sidecar unificado (Decisión 6) es quien postea; overlay `cowrie.cfg` expone el jsonlog en el bind-mount |
+| n8n caído → cowrie escribe al archivo sin parar | Medio | Sidecar con retry + cola en memoria; sin pérdida de eventos (TDD) |
+| Rotación/recreación del jsonlog rompe el tailer del sidecar | Medio | Sidecar detecta recreación del archivo y re-tail desde inicio (TDD) |
+| El sidecar no alcanza n8n o el bind-mount (redes/permisos) | Alto | Sidecar en `red_dmz` + `red_interna`; verificar conectividad (task 6.x) |
+| `password` en `login.success` se persiste sin filtrar | Medio | Sidecar opcionalmente la elimina; el workflow la filtra SIEMPRE antes de insertar |
+| `dionaea.json` no existe en esta fase | Bajo | Fuente dionaea dormante; el sidecar arranca con solo cowrie |
