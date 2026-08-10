@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "chunks": [
+    {
+      "id": "ab95bcca",
+      "created_by": "navar",
+      "created_at": "2026-08-10T00:27:03Z",
+      "sessions": 2,
+      "memories": 5,
+      "prompts": 14
+    }
+  ]
+}
