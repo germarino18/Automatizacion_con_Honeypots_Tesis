@@ -132,7 +132,7 @@ services:
     volumes:
       - ./grafana:/var/lib/grafana
     ports:
-      - "3000:3000"
+      - "${GRAFANA_PORT:-3000}:3000"
     networks:
       - red_interna
     depends_on:
