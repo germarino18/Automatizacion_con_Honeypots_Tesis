@@ -1,15 +1,16 @@
 ## Why
 
-Los honeypots (Cowrie y Dionaea) ya están enviando webhooks a n8n cuando detectan actividad, pero n8n no tiene ningún workflow configurado. Esto significa que los datos de los ataques se pierden. Necesitamos crear workflows que reciban, procesen y almacenen estos eventos en PostgreSQL para poder analizarlos después en Grafana.
+Los honeypots (Cowrie y Dionaea) ya están configurados para enviar webhooks a n8n cuando detectan actividad, pero n8n no tiene workflows que procesen esos datos de forma correcta y persistente. Esto significa que los datos de los ataques se pierden. Necesitamos workflows que reciban, procesen y almacenen estos eventos en PostgreSQL para poder analizarlos después en Grafana.
 
 Sin los workflows, el sistema de detección está mudo — los honeypots ven actividad pero no queda registro.
 
 ## What Changes
 
-- Crear tabla `attack_events` en PostgreSQL con esquema unificado para ataques de Cowrie y Dionaea
-- Crear workflow en n8n `Cowrie Webhook` que reciba eventos SSH/Telnet y los guarde en PostgreSQL
-- Crear workflow en n8n `Dionaea Webhook` que reciba eventos de malware/SMB/FTP y los guarde en PostgreSQL
-- Agregar campo `source` para identificar qué honeypot generó cada evento
+- Usar la tabla existente `honeypot_events` en PostgreSQL (16 columnas, creada por `init.sql`) como esquema unificado para ataques de Cowrie y Dionaea
+- **Cowrie**: adoptar el playbook existente **PB-H1** (`pb-h1-reconocimiento-v1.0.json`) como receptor del webhook `/webhook/cowrie` — arreglar su SQL (parametrizado, cast JSONB correcto, `raw_data`, validación `src_ip`) en lugar de crear un workflow desde cero
+- **Cowrie (comandos)**: convertir el playbook **PB-H2** (`pb-h2-ejecucion-comandos-v1.0.json`) en sub-workflow ejecutado desde PB-H1 vía nodo *Execute Workflow* cuando el evento contiene un comando
+- **Dionaea**: crear workflow `Dionaea Webhook` que reciba eventos de malware/SMB/FTP en `/webhook/dionaea` y los guarde en PostgreSQL (no existe hoy)
+- Agregar campo `source_honeypot` para identificar qué honeypot generó cada evento
 - Configurar n8n para que los workflows se importen desde archivos versionables (no solo desde la UI)
 
 ## Capabilities
@@ -22,7 +23,7 @@ Sin los workflows, el sistema de detección está mudo — los honeypots ven act
 
 ## Impact
 
-- **PostgreSQL**: Nueva tabla `attack_events` (o vistas) en la base de datos existente
-- **n8n**: Dos nuevos workflows importables vía archivos JSON
-- **Cowrie/Dionaea**: Sin cambios — ya envían los webhooks, solo necesitan ser recibidos
+- **PostgreSQL**: La tabla `honeypot_events` ya existe (creada por `init.sql` con índices y vista); los workflows la pueblan
+- **n8n**: Tres workflows importables vía archivos JSON — PB-H1 (receptor Cowrie), PB-H2 (sub-workflow comandos), Dionaea Webhook (nuevo)
+- **Cowrie/Dionaea**: Sin cambios — ya envían los webhooks, solo necesitan ser recibidos. (Nota: la emisión real de Dionaea se resuelve en el change `conectar-y-verificar` / "puente Dionaea")
 - **Grafana**: Beneficiario downstream — cuando lleguemos a dashboards ya tendrá datos
