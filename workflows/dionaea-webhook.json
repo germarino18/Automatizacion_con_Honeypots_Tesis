@@ -1,0 +1,115 @@
+{
+  "name": "Dionaea Webhook",
+  "active": true,
+  "id": "WAz6AjjCjIRDUGuh",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "dionaea",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "webhook-dionaea",
+      "name": "Webhook Dionaea",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "dionaea-webhook-001"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Normalizar payload Dionaea (Decisión 4)\nconst event = $input.all()[0].json || {};\nconst conn = event.connection || {};\nconst download = event.download || {};\n\n// Validar src_ip como inet (connection.remote_host); fallback '0.0.0.0'\nconst ip = conn.remote_host || event.remote_host || '';\nconst valid = /^(\\d{1,3}\\.){3}\\d{1,3}$/.test(ip) && ip.split('.').every(n => +n >= 0 && +n <= 255);\n\n// dst_port ← connection.local_port (parseInt defensivo)\nconst rawPort = conn.local_port || event.local_port;\nconst dstPort = rawPort === undefined || rawPort === null ? null : parseInt(rawPort, 10);\n\nconst normalized = {\n  timestamp: event.timestamp || new Date().toISOString(),\n  source_honeypot: 'dionaea',\n  src_ip: valid ? ip : '0.0.0.0',\n  dst_port: Number.isNaN(dstPort) ? null : dstPort,\n  protocol: conn.protocol || event.protocol || 'smb',\n  username: null,\n  commands: null,\n  malware_hash: download.sha256 || download.sha256sum || null,\n  malware_filename: download.name || download.filename || null,\n  playbook_id: 'PB-DIONAEA-v1.0',\n  risk_score: 0,\n  att_ck_technique: 'T1190',\n  enrichment_data: null,\n  raw_data: event\n};\n\nreturn [{ json: normalized }];"
+      },
+      "id": "code-map-dionaea",
+      "name": "Mapear Dionaea",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO honeypot_events (timestamp, source_honeypot, src_ip, dst_port, protocol, username, commands, malware_hash, malware_filename, playbook_id, risk_score, att_ck_technique, enrichment_data, raw_data) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, CAST($13 AS jsonb), CAST($14 AS jsonb))",
+        "options": {
+          "queryReplacement": "={{ $json[\"timestamp\"] }},={{ $json[\"source_honeypot\"] }},={{ $json[\"src_ip\"] }},={{ $json[\"dst_port\"] }},={{ $json[\"protocol\"] }},={{ $json[\"username\"] }},={{ $json[\"commands\"] }},={{ $json[\"malware_hash\"] }},={{ $json[\"malware_filename\"] }},={{ $json[\"playbook_id\"] }},={{ $json[\"risk_score\"] || 0 }},={{ $json[\"att_ck_technique\"] }},={{ $json[\"enrichment_data\"] }},={{ $json[\"raw_data\"] }}"
+        }
+      },
+      "id": "postgres-dionaea",
+      "name": "PostgreSQL Auditar Dionaea",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [650, 300],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-cred-001",
+          "name": "PostgreSQL_Audit"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"status\":\"processed\",\"source\":\"dionaea\"}",
+        "options": {}
+      },
+      "id": "respond-dionaea",
+      "name": "Responder Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [850, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Dionaea": {
+      "main": [
+        [
+          {
+            "node": "Mapear Dionaea",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mapear Dionaea": {
+      "main": [
+        [
+          {
+            "node": "PostgreSQL Auditar Dionaea",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PostgreSQL Auditar Dionaea": {
+      "main": [
+        [
+          {
+            "node": "Responder Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "pb-dionaea-v1.0-20260810",
+  "meta": {
+    "instanceId": "honeypot-soc-n8n",
+    "templateCredsSetupCompleted": true
+  },
+  "tags": [
+    {
+      "name": "Dionaea"
+    }
+  ]
+}

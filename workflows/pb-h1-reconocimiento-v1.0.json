@@ -1,11 +1,13 @@
 {
   "name": "PB-H1 - Reconocimiento y Escaneo (T1595/T1046)",
+  "active": true,
+  "id": "ITqYH4UNwfatkrRS",
   "nodes": [
     {
       "parameters": {
         "httpMethod": "POST",
         "path": "cowrie",
-        "responseMode": "lastNode",
+        "responseMode": "responseNode",
         "options": {}
       },
       "id": "webhook-cowrie",
@@ -17,14 +19,16 @@
     },
     {
       "parameters": {
-        "functionCode": "// Normalizar datos del honeypot\nconst event = $input.all()[0].json;\n\nreturn {\n  timestamp: event.timestamp || new Date().toISOString(),\n  source_honeypot: 'cowrie',\n  src_ip: event.src_ip || event.source_ip,\n  dst_port: event.dst_port || event.port,\n  session_id: event.session || event.session_id,\n  commands: event.input || event.command || '',\n  event_type: event.event || 'connection',\n  playbook_id: 'PB-H1-v1.0',\n  att_ck_technique: event.dst_port === 2222 ? 'T1595' : 'T1046'\n};"
-      },
-      "id": "function-normalize",
-      "name": "Normalizar Datos",
-      "type": "n8n-nodes-base.function",
-      "typeVersion": 1,
-      "position": [450, 300]
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Normalizar datos del honeypot (Corrección A - PB-H1)\nconst event = $input.all()[0].json || {};\n// n8n v2 webhook envuelve el payload en .body — desempaquetar para leer los campos del evento\nconst payload = (event.body && typeof event.body === 'object') ? event.body : event;\n\n// Validación de src_ip como inet\nconst ip = payload.src_ip || payload.source_ip || '';\nconst valid = /^(\\d{1,3}\\.){3}\\d{1,3}$/.test(ip) && ip.split('.').every(n => +n >= 0 && +n <= 255);\n\nconst normalized = {\n  timestamp: payload.timestamp || new Date().toISOString(),\n  source_honeypot: 'cowrie',\n  src_ip: valid ? ip : '0.0.0.0',\n  dst_port: payload.dst_port || payload.port || null,\n  session_id: payload.session || payload.session_id,\n  commands: payload.input || payload.command || '',\n  event_type: payload.event || 'connection',\n  playbook_id: 'PB-H1-v1.0',\n  att_ck_technique: payload.dst_port === 2222 ? 'T1595' : 'T1046',\n  eventid: payload.eventid || '',\n  username: payload.username || null,\n  protocol: payload.protocol || 'ssh',\n  enrichment_data: null,\n  raw_data: payload\n};\n\nreturn [{ json: normalized }];"
     },
+    "id": "function-normalize",
+    "name": "Normalizar Datos",
+    "type": "n8n-nodes-base.code",
+    "typeVersion": 2,
+    "position": [450, 300]
+  },
     {
       "parameters": {
         "method": "GET",
@@ -67,7 +71,8 @@
           "id": "abuseipdb-cred-001",
           "name": "AbuseIPDB_API"
         }
-      }
+      },
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -94,17 +99,21 @@
           "id": "shodan-cred-001",
           "name": "Shodan_API"
         }
-      }
+      },
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
-        "functionCode": "// Calcular score de riesgo\nconst abuseData = $input.all()[1].json.data || {};\nconst shodanData = $input.all()[2].json || {};\n\nlet score = 0;\n\n// Score por reputación AbuseIPDB\nconst abuseScore = abuseData.abuseConfidenceScore || 0;\nif (abuseScore > 50) score += 0.3;\nif (abuseScore > 80) score += 0.2;\n\n// Score por tipo de organización (hosting/cloud = más riesgoso)\nconst org = shodanData.org || '';\nif (org.toLowerCase().includes('hosting') || org.toLowerCase().includes('cloud')) {\n  score += 0.2;\n}\n\n// Score por múltiples puertos escaneados\nconst openPorts = shodanData.ports || [];\nif (openPorts.length > 5) score += 0.2;\n\n// Score por vulnerabilidades conocidas\nconst vulns = shodanData.vulns || [];\nif (vulns.length > 0) score += 0.2;\n\n// Normalizar score entre 0 y 1\nscore = Math.min(score, 1.0);\n\nreturn {\n  ...$input.all()[0].json,\n  risk_score: score,\n  abuse_confidence: abuseScore,\n  organization: org,\n  open_ports_count: openPorts.length,\n  has_vulns: vulns.length > 0,\n  enrichment_timestamp: new Date().toISOString()\n};"
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Calcular score de riesgo\n// Referencias a nodos hermanos de la rama de enriquecimiento (AbuseIPDB/Shodan/Normalizar)\nconst abuseItems = $('AbuseIPDB Lookup').all() || [];\nconst shodanItems = $('Shodan Lookup').all() || [];\nconst normalizedItems = $('Normalizar Datos').all() || [];\nconst base = (normalizedItems[0] && normalizedItems[0].json) ? normalizedItems[0].json : (($input.all()[0] && $input.all()[0].json) || {});\n\nconst abuseData = (abuseItems[0] && abuseItems[0].json && abuseItems[0].json.data) || {};\nconst shodanData = (shodanItems[0] && shodanItems[0].json) || {};\n\nlet score = 0;\n\n// Score por reputación AbuseIPDB\nconst abuseScore = abuseData.abuseConfidenceScore || 0;\nif (abuseScore > 50) score += 0.3;\nif (abuseScore > 80) score += 0.2;\n\n// Score por tipo de organización (hosting/cloud = más riesgoso)\nconst org = shodanData.org || '';\nif (org.toLowerCase().includes('hosting') || org.toLowerCase().includes('cloud')) {\n  score += 0.2;\n}\n\n// Score por múltiples puertos escaneados\nconst openPorts = shodanData.ports || [];\nif (openPorts.length > 5) score += 0.2;\n\n// Score por vulnerabilidades conocidas\nconst vulns = shodanData.vulns || [];\nif (vulns.length > 0) score += 0.2;\n\n// Normalizar score entre 0 y 1\nscore = Math.min(score, 1.0);\n\nreturn [{\n  json: {\n    ...base,\n    risk_score: score,\n    abuse_confidence: abuseScore,\n    organization: org,\n    open_ports_count: openPorts.length,\n    has_vulns: vulns.length > 0,\n    enrichment_timestamp: new Date().toISOString()\n  }\n}];"
       },
       "id": "function-scoring",
       "name": "Calcular Risk Score",
-      "type": "n8n-nodes-base.function",
-      "typeVersion": 1,
-      "position": [1050, 300]
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 300],
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -112,7 +121,7 @@
           "boolean": [
             {
               "value1": "={{ $json[\"risk_score\"] }}",
-              "operation": "greaterEqual",
+              "operation": "largerEqual",
               "value2": "0.8"
             }
           ]
@@ -122,7 +131,8 @@
       "name": "¿Riesgo Alto? (≥0.8)",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [1250, 300]
+      "position": [1250, 300],
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -130,7 +140,7 @@
           "boolean": [
             {
               "value1": "={{ $json[\"risk_score\"] }}",
-              "operation": "greaterEqual",
+              "operation": "largerEqual",
               "value2": "0.5"
             },
             {
@@ -145,7 +155,8 @@
       "name": "¿Riesgo Medio? (0.5-0.79)",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [1450, 300]
+      "position": [1450, 300],
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -180,7 +191,8 @@
           "id": "firewall-cred-001",
           "name": "Firewall_API"
         }
-      }
+      },
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -211,7 +223,8 @@
           "id": "slack-cred-001",
           "name": "Slack_API"
         }
-      }
+      },
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -223,7 +236,8 @@
       "name": "Esperar Aprobación Humana",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1,
-      "position": [1650, 400]
+      "position": [1650, 400],
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -250,13 +264,16 @@
           "id": "glpi-cred-001",
           "name": "GLPI_API"
         }
-      }
+      },
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO honeypot_events (timestamp, source_honeypot, src_ip, dst_port, commands, playbook_id, risk_score, att_ck_technique, enrichment_data) VALUES ('{{ $json[\"timestamp\"] }}', '{{ $json[\"source_honeypot\"] }}', '{{ $json[\"src_ip\"] }}', {{ $json[\"dst_port\"] }}, '{{ $json[\"commands\"] }}', '{{ $json[\"playbook_id\"] }}', {{ $json[\"risk_score\"] }}, '{{ $json[\"att_ck_technique\"] }}', '{{ $json[\"enrichment_timestamp\"] }}'::jsonb);",
-        "options": {}
+        "query": "INSERT INTO honeypot_events (timestamp, source_honeypot, src_ip, dst_port, protocol, username, commands, playbook_id, risk_score, att_ck_technique, enrichment_data, raw_data) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CAST($11 AS jsonb), CAST($12 AS jsonb)) RETURNING id, timestamp, src_ip",
+        "options": {
+          "queryReplacement": "={{ $json[\"timestamp\"] }},={{ $json[\"source_honeypot\"] }},={{ $json[\"src_ip\"] }},={{ $json[\"dst_port\"] }},={{ $json[\"protocol\"] }},={{ $json[\"username\"] }},={{ $json[\"commands\"] }},={{ $json[\"playbook_id\"] }},={{ $json[\"risk_score\"] || 0 }},={{ $json[\"att_ck_technique\"] }},={{ $json[\"enrichment_data\"] }},={{ $json[\"raw_data\"] }}"
+        }
       },
       "id": "postgres-audit",
       "name": "PostgreSQL Auditoría",
@@ -272,8 +289,43 @@
     },
     {
       "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json[\"commands\"] }}",
+              "operation": "notEqual",
+              "value2": ""
+            }
+          ]
+        }
+      },
+      "id": "if-command",
+      "name": "¿Comando Ejecutado?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [700, 520],
+      "notes": "Corrección C: desvío condicional hacia PB-H2. Si el evento normalizado contiene 'commands' no vacío (ejecución de comando, p.ej. eventid cowrie.command.input), sale por 'true' y dispara 'Ejecutar PB-H2'. La rama 'false' termina sin conexión (fin de rama). Mientras tanto, la cadena de enriquecimiento (AbuseIPDB/Shodan/Risk Score) corre para TODOS los eventos vía fan-out desde 'Normalizar Datos'. Diseño según design.md: PB-H2 corre cuando el evento contiene un comando."
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "value": "nFnt9n3Gk8Gh27mg",
+          "name": "PB-H2 - Ejecución de Comandos Maliciosos (T1059)"
+        },
+        "options": {}
+      },
+      "id": "exec-pb-h2",
+      "name": "Ejecutar PB-H2",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [900, 520],
+      "onError": "continueRegularOutput",
+      "notes": "PB-H2 sub-workflow activo: workflowId apunta al id real del sub-workflow PB-H2 (nFnt9n3Gk8Gh27mg), importado sin webhook propio. Recibe el evento normalizado completo (commands, src_ip, raw_data, etc.). onError continueRegularOutput: si PB-H2 falla (p.ej. credenciales VirusTotal/Whois ausentes), la rama falla-open y NO rompe la respuesta del webhook ni la auditoría."
+    },
+    {
+      "parameters": {
         "respondWith": "json",
-        "responseBody": "{\"status\": \"processed\", \"event_id\": \"{{ $json[\"src_ip\"] }}-{{ $json[\"timestamp\"] }}\"}",
+        "responseBody": "={{ JSON.stringify({ status: 'processed', event_id: $json['src_ip'] + '-' + $json['timestamp'] }) }}",
         "options": {}
       },
       "id": "respond-webhook",
@@ -299,7 +351,28 @@
       "main": [
         [
           {
+            "node": "PostgreSQL Auditoría",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "¿Comando Ejecutado?",
+            "type": "main",
+            "index": 0
+          },
+          {
             "node": "AbuseIPDB Lookup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Comando Ejecutado?": {
+      "main": [
+        [
+          {
+            "node": "Ejecutar PB-H2",
             "type": "main",
             "index": 0
           }
@@ -366,13 +439,7 @@
             "index": 0
           }
         ],
-        [
-          {
-            "node": "PostgreSQL Auditoría",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        []
       ]
     },
     "Bloqueo Firewall": {
@@ -386,33 +453,11 @@
         ]
       ]
     },
-    "Slack Alerta Crítica": {
-      "main": [
-        [
-          {
-            "node": "PostgreSQL Auditoría",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Esperar Aprobación Humana": {
       "main": [
         [
           {
             "node": "Crear Ticket GLPI",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Crear Ticket GLPI": {
-      "main": [
-        [
-          {
-            "node": "PostgreSQL Auditoría",
             "type": "main",
             "index": 0
           }

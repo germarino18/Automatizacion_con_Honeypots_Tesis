@@ -1,29 +1,31 @@
 {
   "name": "PB-H2 - Ejecución de Comandos Maliciosos (T1059)",
+  "active": true,
+  "id": "nFnt9n3Gk8Gh27mg",
   "nodes": [
     {
       "parameters": {
-        "httpMethod": "POST",
-        "path": "cowrie-command",
-        "responseMode": "lastNode",
-        "options": {}
+        "inputSource": "passthrough"
       },
-      "id": "webhook-command",
-      "name": "Webhook Comandos",
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 1,
+      "id": "trigger-inicio-h2",
+      "name": "Inicio (Sub-workflow)",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
       "position": [250, 300],
-      "webhookId": "cowrie-command-webhook-001"
+      "notes": "PB-H2 se ejecuta como SUB-WORKFLOW llamado por PB-H1 (nodo Execute Workflow). n8n 2.x exige un nodo executeWorkflowTrigger como punto de entrada del sub-workflow (el noOp no califica -> 'Missing node to start execution'). El evento normalizado completo llega como input del sub-workflow."
     },
     {
       "parameters": {
-        "functionCode": "// Extraer IOCs de comandos\nconst event = $input.all()[0].json;\nconst command = event.input || event.command || '';\n\n// Extraer URLs con regex\nconst urlRegex = /(https?:\\/\\/[^\\s]+)/g;\nconst urls = command.match(urlRegex) || [];\n\n// Extraer dominios\nconst domainRegex = /(?:https?:\\/\\/)?([\\w\\-]+\\.[\\w\\-\\.]+)/g;\nconst domains = command.match(domainRegex) || [];\n\n// Detectar comandos peligrosos\nconst dangerousCommands = ['rm -rf', 'chmod 777', 'nc -e', 'wget', 'curl', 'python -c', 'bash -i'];\nconst isDangerous = dangerousCommands.some(dc => command.toLowerCase().includes(dc));\n\nreturn {\n  timestamp: event.timestamp || new Date().toISOString(),\n  source_honeypot: 'cowrie',\n  src_ip: event.src_ip || event.source_ip,\n  session_id: event.session || event.session_id,\n  commands: command,\n  extracted_urls: urls,\n  extracted_domains: domains,\n  is_dangerous_command: isDangerous,\n  playbook_id: 'PB-H2-v1.0',\n  att_ck_technique: 'T1059'\n};"
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const event = $input.all()[0].json || {};\nconst command = event.input || event.command || event.commands || '';\n\nconst urlRegex = /(https?:\\/\\/[^\\s]+)/g;\nconst urls = command.match(urlRegex) || [];\n\nconst domainRegex = /(?:https?:\\/\\/)?([\\w\\-]+\\.[\\w\\-\\.]+)/g;\nconst domains = command.match(domainRegex) || [];\n\nconst dangerousCommands = ['rm -rf', 'chmod 777', 'nc -e', 'wget', 'curl', 'python -c', 'bash -i'];\nconst isDangerous = dangerousCommands.some(dc => command.toLowerCase().includes(dc));\n\nconst ip = event.src_ip || event.source_ip || '';\nconst valid = /^(\\d{1,3}\\.){3}\\d{1,3}$/.test(ip) && ip.split('.').every(n => +n >= 0 && +n <= 255);\n\nreturn [{\n  json: {\n    timestamp: event.timestamp || new Date().toISOString(),\n    source_honeypot: 'cowrie',\n    src_ip: valid ? ip : '0.0.0.0',\n    dst_port: event.dst_port || event.port || null,\n    protocol: event.protocol || 'ssh',\n    username: event.username || null,\n    session_id: event.session || event.session_id,\n    commands: command,\n    extracted_urls: urls,\n    extracted_domains: domains,\n    is_dangerous_command: isDangerous,\n    playbook_id: 'PB-H2-v1.0',\n    att_ck_technique: 'T1059',\n    enrichment_data: {},\n    raw_data: event\n  }\n}];"
       },
-      "id": "function-extract-iocs",
+      "id": "code-extract-iocs",
       "name": "Extraer IOCs",
-      "type": "n8n-nodes-base.function",
-      "typeVersion": 1,
-      "position": [450, 300]
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300],
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -50,7 +52,8 @@
           "id": "virustotal-cred-001",
           "name": "VirusTotal_API"
         }
-      }
+      },
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -81,17 +84,19 @@
           "id": "whois-cred-001",
           "name": "Whois_API"
         }
-      }
+      },
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
-        "functionCode": "// Calcular score de riesgo para comandos\nconst vtData = $input.all()[1].json.data || {};\nconst whoisData = $input.all()[2].json || {};\nconst event = $input.all()[0].json;\n\nlet score = 0;\n\n// Score por detecciones en VirusTotal\nconst vtDetections = vtData.attributes?.last_analysis_stats?.malicious || 0;\nif (vtDetections > 5) score += 0.4;\nif (vtDetections > 10) score += 0.2;\n\n// Score por dominio reciente (< 30 días)\nconst domainAge = whoisData.created_date || '';\nif (domainAge) {\n  const created = new Date(domainAge);\n  const daysOld = (new Date() - created) / (1000 * 60 * 60 * 24);\n  if (daysOld < 30) score += 0.3;\n}\n\n// Score por comando peligroso\nif (event.is_dangerous_command) score += 0.3;\n\n// Score por múltiples URLs\nif (event.extracted_urls.length > 2) score += 0.2;\n\nscore = Math.min(score, 1.0);\n\nreturn {\n  ...event,\n  risk_score: score,\n  vt_detections: vtDetections,\n  domain_age_days: domainAge ? ((new Date() - new Date(domainAge)) / (1000 * 60 * 60 * 24)).toFixed(0) : 'N/A',\n  enrichment_timestamp: new Date().toISOString()\n};"
+        "functionCode": "// Calcular score de riesgo para comandos\n// Referencias a nodos de enriquecimiento (VirusTotal/WHOIS) con fallback\n// base: evento limpio desde Extraer IOCs (robusto aunque el enriquecimiento falle)\nconst baseItems = $('Extraer IOCs').all() || [];\nconst base = (baseItems[0] && baseItems[0].json) ? baseItems[0].json : (($input.all()[0] && $input.all()[0].json) || {});\nconst vtItems = $('VirusTotal Lookup').all() || [];\nconst whoisItems = $('WHOIS Domain').all() || [];\n\nconst vtData = (vtItems[0] && vtItems[0].json && vtItems[0].json.data) || {};\nconst whoisData = (whoisItems[0] && whoisItems[0].json) || {};\n\nlet score = 0;\n\n// Score por detecciones en VirusTotal\nconst vtDetections = vtData.attributes?.last_analysis_stats?.malicious || 0;\nif (vtDetections > 5) score += 0.4;\nif (vtDetections > 10) score += 0.2;\n\n// Score por dominio reciente (< 30 días)\nconst domainAge = whoisData.created_date || '';\nif (domainAge) {\n  const created = new Date(domainAge);\n  const daysOld = (new Date() - created) / (1000 * 60 * 60 * 24);\n  if (daysOld < 30) score += 0.3;\n}\n\n// Score por comando peligroso\nif (base.is_dangerous_command) score += 0.3;\n\n// Score por múltiples URLs\nif ((base.extracted_urls || []).length > 2) score += 0.2;\n\nscore = Math.min(score, 1.0);\n\nreturn [{\n  json: {\n    ...base,\n    risk_score: score,\n    vt_detections: vtDetections,\n    domain_age_days: domainAge ? ((new Date() - new Date(domainAge)) / (1000 * 60 * 60 * 24)).toFixed(0) : 'N/A',\n    enrichment_timestamp: new Date().toISOString()\n  }\n}];"
       },
       "id": "function-scoring-h2",
       "name": "Calcular Risk Score",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
-      "position": [1050, 300]
+      "position": [1050, 300],
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -99,7 +104,7 @@
           "boolean": [
             {
               "value1": "={{ $json[\"risk_score\"] }}",
-              "operation": "greaterEqual",
+              "operation": "largerEqual",
               "value2": "0.75"
             }
           ]
@@ -140,7 +145,8 @@
           "id": "slack-cred-001",
           "name": "Slack_API"
         }
-      }
+      },
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -175,7 +181,8 @@
           "id": "firewall-cred-001",
           "name": "Firewall_API"
         }
-      }
+      },
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -202,7 +209,8 @@
           "id": "glpi-cred-001",
           "name": "GLPI_API"
         }
-      }
+      },
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -233,13 +241,16 @@
           "id": "slack-cred-001",
           "name": "Slack_API"
         }
-      }
+      },
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO honeypot_events (timestamp, source_honeypot, src_ip, dst_port, commands, playbook_id, risk_score, att_ck_technique, enrichment_data) VALUES ('{{ $json[\"timestamp\"] }}', '{{ $json[\"source_honeypot\"] }}', '{{ $json[\"src_ip\"] }}', 2222, '{{ $json[\"commands\"] }}', '{{ $json[\"playbook_id\"] }}', {{ $json[\"risk_score\"] }}, '{{ $json[\"att_ck_technique\"] }}', '{{ $json[\"enrichment_timestamp\"] }}'::jsonb);",
-        "options": {}
+        "query": "INSERT INTO honeypot_events (timestamp, source_honeypot, src_ip, dst_port, protocol, username, commands, playbook_id, risk_score, att_ck_technique, enrichment_data, raw_data) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CAST($11 AS jsonb), CAST($12 AS jsonb)) RETURNING id, timestamp, src_ip, commands, risk_score",
+        "options": {
+          "queryReplacement": "={{ $json[\"timestamp\"] }},={{ $json[\"source_honeypot\"] }},={{ $json[\"src_ip\"] }},={{ $json[\"dst_port\"] }},={{ $json[\"protocol\"] }},={{ $json[\"username\"] }},={{ $json[\"commands\"] }},={{ $json[\"playbook_id\"] }},={{ $json[\"risk_score\"] || 0 }},={{ $json[\"att_ck_technique\"] }},={{ $json[\"enrichment_data\"] }},={{ $json[\"raw_data\"] }}"
+        }
       },
       "id": "postgres-audit-h2",
       "name": "PostgreSQL Auditoría",
@@ -256,8 +267,10 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO responses (event_id, action_type, actor, status, evidence_uri) VALUES ((SELECT id FROM honeypot_events WHERE src_ip = '{{ $json[\"src_ip\"] }}' ORDER BY timestamp DESC LIMIT 1), '{{ $json[\"risk_score\"] >= 0.75 ? \"block\" : \"log\" }}', 'n8n-automated', 'completed', '/evidence/{{ $json[\"src_ip\"] }}-{{ $json[\"timestamp\"] }}');",
-        "options": {}
+        "query": "INSERT INTO responses (event_id, action_type, actor, status, evidence_uri) VALUES ((SELECT id FROM honeypot_events WHERE src_ip = $1 AND commands = $2 ORDER BY id DESC LIMIT 1), $3, $4, $5, $6)",
+        "options": {
+          "queryReplacement": "={{ $json[\"src_ip\"] }},={{ $json[\"commands\"] }},={{ $json[\"risk_score\"] >= 0.75 ? \"block\" : \"log\" }},n8n-automated,completed,={{ \"/evidence/\" + $json[\"src_ip\"] + \"-\" + $json[\"timestamp\"] }}"
+        }
       },
       "id": "postgres-response",
       "name": "PostgreSQL Respuestas",
@@ -270,22 +283,10 @@
           "name": "PostgreSQL_Audit"
         }
       }
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "{\"status\": \"processed\", \"playbook\": \"PB-H2\", \"risk_score\": {{ $json[\"risk_score\"] }} }",
-        "options": {}
-      },
-      "id": "respond-webhook-h2",
-      "name": "Responder Webhook",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1,
-      "position": [2450, 300]
     }
   ],
   "connections": {
-    "Webhook Comandos": {
+    "Inicio (Sub-workflow)": {
       "main": [
         [
           {
@@ -336,6 +337,11 @@
             "node": "¿Riesgo Crítico? (≥0.75)",
             "type": "main",
             "index": 0
+          },
+          {
+            "node": "PostgreSQL Auditoría",
+            "type": "main",
+            "index": 0
           }
         ]
       ]
@@ -382,24 +388,12 @@
     },
     "Crear Ticket Prioritario": {
       "main": [
-        [
-          {
-            "node": "PostgreSQL Auditoría",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        []
       ]
     },
     "Slack Notificación Informativa": {
       "main": [
-        [
-          {
-            "node": "PostgreSQL Auditoría",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        []
       ]
     },
     "PostgreSQL Auditoría": {
@@ -407,17 +401,6 @@
         [
           {
             "node": "PostgreSQL Respuestas",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "PostgreSQL Respuestas": {
-      "main": [
-        [
-          {
-            "node": "Responder Webhook",
             "type": "main",
             "index": 0
           }
