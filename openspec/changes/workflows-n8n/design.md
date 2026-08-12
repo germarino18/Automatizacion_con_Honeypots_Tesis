@@ -154,10 +154,11 @@ dionaea  (dionaea.json → bind-mount dionaea/logs) ──┘
   - `N8N_DIONAEA_URL` → `http://n8n:5678/webhook/dionaea`
 - **Retry strategy:** si n8n está caído, reintenta con backoff (aleatorio/exp/exponencial) y retiene el evento en cola hasta éxito — cowrie escribe al archivo pase lo que pase, el sidecar NO debe perder eventos.
 - **Log rotation:** debe detectar la recreación/re-escritura del archivo (p.ej. truncado o nuevo inode) y re-tail desde el principio de ese archivo nuevo, sin duplicar ni perder líneas.
-- **Payload normalization:** pass-through del event dict + tag `source_honeypot`. Forma canónica:
+- **Payload normalization:** pass-through del event dict + tag `source_honeypot`. **Forma canónica (verificada en E2E 6.8):** los workflows PB-H1 ("Normalizar Datos") y Dionaea ("Mapear Dionaea") leen los campos del honeypot desde la RAÍZ del body del webhook, por lo que el sidecar aplana el payload con el tag al mismo nivel (no anidado):
   ```json
-  { "source_honeypot": "cowrie", "event": { ...evento cowrie... } }
+  { "source_honeypot": "cowrie", "session": "...", "src_ip": "...", "eventid": "...", ... }
   ```
+  La forma anidada `{ "source_honeypot": "cowrie", "event": { ... } }` se descartó en el apply: los nodos Code leen `payload.src_ip`/`payload.eventid` en la raíz, y no se modifican los workflows. `raw_data` del workflow captura este payload íntegro (incluye `source_honeypot`).
   Para cowrie, claves canónicas comunes: `session`, `protocol`, `src_ip`, `src_port`, `dst_ip`, `dst_port`, `eventid`, `sensor`, `uuid`, `timestamp`, `message`; por eventid: `login.success` → `username`/`password`; `command.input` → `input`; `client.version` → `version`; `log.closed` → `ttylog`/`size`/`shasum`/`duplicate`/`duration_ms`.
 - **Strip de password (opcional):** el sidecar PUEDE eliminar el campo `password` de `login.success` antes de postear (política de seguridad); en todo caso el workflow de n8n DEBE filtrarlo antes de persistir (ver nota de seguridad).
 - **TDD obligatorio:** el sidecar es código que nosotros escribimos — se debe testar con unit tests (tailer, retry, normalización) antes de integrar.

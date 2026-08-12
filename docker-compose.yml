@@ -159,6 +159,31 @@ services:
       - n8n
     restart: unless-stopped
 
+  # -------------------------------------------
+  # 7. BRIDGE (Sidecar unificado)
+  # -------------------------------------------
+  sidecar:
+    build:
+      context: ./sidecar
+    container_name: soc-sidecar
+    environment:
+      # Rutas de los jsonlog dentro del sidecar (mounts de solo lectura)
+      - COWRIE_JSONLOG_PATH=/logs/cowrie/cowrie.json
+      - DIONAEA_JSONLOG_PATH=/logs/dionaea/dionaea/dionaea.json
+      # Webhooks de n8n (red_interna)
+      - N8N_COWRIE_URL=http://n8n:5678/webhook/cowrie
+      - N8N_DIONAEA_URL=http://n8n:5678/webhook/dionaea
+    volumes:
+      - ./cowrie/logs:/logs/cowrie:ro
+      - ./dionaea/logs:/logs/dionaea:ro
+    networks:
+      - red_dmz
+      - red_interna
+    depends_on:
+      n8n:
+        condition: service_started
+    restart: unless-stopped
+
 # ===========================================
 # REDES
 # ===========================================
