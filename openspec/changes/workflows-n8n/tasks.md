@@ -46,5 +46,12 @@
 - [x] 6.4 Configurar el overlay de Cowrie: `cowrie/config/cowrie.cfg` con `[output_jsonlog]` `enabled = true` y `logfile = log/cowrie.json` (bind-mount `cowrie/logs`; el jsonlog sale del volumen anónimo)
 - [x] 6.5 Agregar el servicio sidecar a `docker-compose.yml`: redes `red_dmz` + `red_interna`, mounts `cowrie/logs` + `dionaea/logs` (solo lectura), env vars `COWRIE_JSONLOG_PATH`, `N8N_COWRIE_URL`, `N8N_DIONAEA_URL`
 - [x] 6.6 Implementar la fuente dionaea (lectura `dionaea.json` → POST a `http://n8n:5678/webhook/dionaea`, `source_honeypot='dionaea'`) — **preparada pero dormante**: si `dionaea.json` no existe, el sidecar arranca igual con solo cowrie
-- [ ] 6.7 Habilitar servicios de Dionaea e ihandler `log_json` (`services-enabled/` + `ihandlers-enabled/`) — **fase posterior, no bloquea este change** (fuente dormante)
+- [ ] 6.7 Habilitar servicios de Dionaea e ihandler `log_json` (`services-enabled/` + `ihandlers-enabled/`)
+  - [ ] 6.7.1 Crear `dionaea/config/dionaea/services-enabled/` con copias de: `smb`, `ftp`, `http` (los 3 puertos mapeados en compose); opcional `mssql` si se agrega puerto 1433 al compose + `.env`
+  - [ ] 6.7.2 Crear `dionaea/config/dionaea/ihandlers-enabled/` con copias de: `log_json` (con path **corregido** a `file://var/log/dionaea/dionaea.json`), `emuprofile`, `ftp`
+  - [ ] 6.7.3 NO incluir `store` (política metadata-only, Decisión 7) — se habilita solo temporalmente en la prueba EICAR (6.7.4)
+  - [ ] 6.7.4 Prueba EICAR controlada: `store` temporal ON + servir archivo EICAR en HTTP local + provocar descarga contra dionaea + verificar que el binario capturado ES el EICAR + `store` OFF nuevamente
+  - [ ] 6.7.5 Sacar del `.gitignore` los directorios `dionaea/config/dionaea/ihandlers-enabled/` y `services-enabled/` para versionarlos
+  - [ ] 6.7.6 Reiniciar `soc-dionaea`, verificar en log que los servicios hacen bind/listen (445/21/80) y que se genera `dionaea/logs/dionaea/dionaea.json`
+  - [ ] 6.7.7 Verificar que el sidecar detecta la fuente dionaea y postea a `/webhook/dionaea` → fila nueva en `honeypot_events` con `source_honeypot='dionaea'`
 - [x] 6.8 Verificar end-to-end: login simulado en Cowrie → sidecar → n8n (PB-H1) → fila nueva en `honeypot_events` con `source_honeypot='cowrie'` y `raw_data`

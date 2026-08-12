@@ -177,6 +177,64 @@ logfile = log/cowrie.json
 
 **Dionaea — fuente preparada / fase posterior:** el sidecar DEBE diseñarse capaz de leer `dionaea.json` y postear a `/webhook/dionaea` (formato de ihandler `log_json` de `dinotools/dionaea`), pero para ESTE change la fuente dionaea está **dormante**: Dionaea sigue inerte por configuración (`services-enabled/` e `ihandlers-enabled/` vacíos → 0 listeners). Habilitar los servicios de Dionaea (y su ihandler `log_json`) es una fase posterior y NO bloquea este change. Con `dionaea.json` ausente, el sidecar arranca igual y solo procesa cowrie.
 
+### Decisión 7: Despertar Dionaea (6.7) y política de captura de malware
+
+**Contexto — por qué Dionaea hoy es un honeypot mudo (verificado en exploración):**
+
+La imagen `dinotools/dionaea:latest` trae un directorio `template/` que contiene los `services-enabled/` (16 symlinks) e `ihandlers-enabled/` (6 symlinks) por defecto. El `entrypoint.sh` los copia a `etc/` **SOLO si `etc/dionaea` NO existe** en el contenedor:
+
+```sh
+test ! -d /opt/dionaea/etc/dionaea && init_etc   # copia template/etc si no existe
+```
+
+Nuestro bind-mount `./dionaea/config:/opt/dionaea/etc` hace que `etc/dionaea` EXISTA → el template **nunca se copia** → no hay `services-enabled/` ni `ihandlers-enabled/` → **0 listeners y 0 ihandlers**. Se confirmó en el log del contenedor vivo: `Initializing services ...` sin ninguna línea de bind/listen posterior. El contenedor está Up pero no atiende nada.
+
+**Elegido:** crear los directorios `*-enabled` como **copias reales** de los `.yaml` (no symlinks — frágiles en Windows + OneDrive + git; dionaea solo lee los archivos, no distingue symlink vs copia).
+
+**Servicios a habilitar (`services-enabled/`):**
+
+| Servicio | Puerto | Recomendación | Razón |
+|----------|--------|---------------|-------|
+| `smb` | 445 (✓ compose) | ✅ **Sí** | El rey del malware en Windows (gusans EternalBlue, ransomware) |
+| `ftp` | 21 (✓ compose) | ✅ **Sí** | Bots dropean payloads vía FTP |
+| `http` | 80 (✓ compose) | ✅ **Sí** | Emula servidor web; captura requests de explotación |
+| `mssql` | 1433 (✗ compose) | ⚠️ Conveniente | Favorita de ransomware moderno (REvil, LockBit) — requiere agregar puerto al compose + `.env` |
+| resto (epmap, sip, upnp, mongo...) | — | ❌ No | Ruido, bajo valor de captura |
+
+**Regla de oro:** un servicio sin puerto mapeado en el compose es plataforma perdida. Base = los 3 del compose; la única expansión considerada es `mssql` con su puerto nuevo.
+
+**Ihandlers a habilitar (`ihandlers-enabled/`):**
+
+| Ihandler | Recomendación | Razón |
+|----------|---------------|-------|
+| `log_json` | ✅ **OBLIGATORIO** | Genera `dionaea.json` que alimenta el sidecar. **NO está en el template** — hay que crearlo y **corregir su path** (ver abajo) |
+| `emuprofile` | ✅ Sí | Perfiles para el módulo `emu` (ya cargado en cfg) — análisis en sandbox |
+| `ftp` | ✅ Sí | Pareja del servicio ftp activo |
+| `store` | ⚠️ **TEMPORAL** | Solo para la prueba EICAR controlada (política de malware, ver abajo). OFF por defecto |
+| `tftp_download` | ❌ | No habilitamos tftp |
+| `cmdshell` | ❌ | Shell falsa = más interacción pero más riesgo/complejidad; agregable luego |
+| `log_sqlite` | ❌ | Duplica en SQLite local lo que ya centralizamos en PostgreSQL — ruido |
+| fail2ban, virustotal, submit_http, p0f, nfq, s3, hpfeeds, log_db_sql... | ❌ | APIs, credenciales o servicios externos que no aportan |
+
+**Path corregido de `log_json` (crítico):** el yaml de `ihandlers-available/` apunta a `file://var/lib/dionaea/dionaea.json` — **FUERA** del bind-mount `./dionaea/logs`. El sidecar espera `/logs/dionaea/dionaea/dionaea.json` = `var/log/dionaea/dionaea.json` en el contenedor. El `log_json.yaml` habilitado debe apuntar a:
+
+```yaml
+- name: log_json
+  config:
+    handlers:
+      - file://var/log/dionaea/dionaea.json
+```
+
+**Política de captura de malware (decisión del usuario):**
+
+- **`store` OFF por defecto → modo metadata-only.** El `dionaea.json` ya captura `sha256`, `md5`, `url`, `tamaño`, `src_ip` — dataset COMPLETO para la tesis de automatización sin almacenar binarios.
+- **Nunca se almacena malware real en la máquina del usuario.** Si el honeypot está expuesto a internet y llega malware real, se pierde (solo queda el hash) — mitigación aceptada.
+- **Captura de binarios = prueba controlada con EICAR** (el "archivo de prueba" inofensivo que todo AV reconoce como malware sin serlo): se enciende `store` temporalmente, se sirve un EICAR desde un HTTP local, se provoca la descarga, se verifica que el archivo capturado ES el EICAR, y se apaga `store`. La cadena queda probada, cero riesgo.
+
+**Discrepancia de rutas de binarios (hallazgo):** el compose monta `./dionaea/binaries:/opt/dionaea/var/dionaea/binaries` pero el cfg tiene `download.dir=var/lib/dionaea/binaries/` → los binarios caerían en un volumen anónimo, NO al host. **Se deja SIN corregir** — es una contención de facto: aunque algo se descargue, no llega al filesystem del host. Documentado como mitigación adicional (no como mecanismo de seguridad formal).
+
+**Versionado:** los 2 directorios `*-enabled` están en `.gitignore` hoy — se deben **sacar del ignore** para versionarlos (repo público, config reproducible).
+
 ## Risks / Trade-offs
 
 | Riesgo | Impacto | Mitigación |
@@ -194,3 +252,7 @@ logfile = log/cowrie.json
 | El sidecar no alcanza n8n o el bind-mount (redes/permisos) | Alto | Sidecar en `red_dmz` + `red_interna`; verificar conectividad (task 6.x) |
 | `password` en `login.success` se persiste sin filtrar | Medio | Sidecar opcionalmente la elimina; el workflow la filtra SIEMPRE antes de insertar |
 | `dionaea.json` no existe en esta fase | Bajo | Fuente dionaea dormante; el sidecar arranca con solo cowrie |
+| Dionaea expuesto a internet captura malware REAL | Alto | Política Decisión 7: `store` OFF por defecto → metadata-only; binarios caen en volumen anónimo (ruta de descargas sin bind-mount) → nunca al host |
+| Los `*-enabled` de dionaea en `.gitignore` no se versionan | Medio | Sacar los 2 directorios del `.gitignore` y commitear los yaml habilitados (Decisión 7) |
+| Symlinks en `*-enabled` (estilo imagen) se rompen en Windows/OneDrive | Medio | Usar copias reales de los `.yaml`, no symlinks (Decisión 7) |
+| `log_json` apunta a `var/lib/...` fuera del bind-mount | Alto | Reescribir el handler a `file://var/log/dionaea/dionaea.json` (Decisión 7) |
