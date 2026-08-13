@@ -17,8 +17,6 @@ cowrie/logs/
 cowrie/downloads/
 dionaea/logs/
 dionaea/binaries/
-dionaea/config/dionaea/ihandlers-enabled/
-dionaea/config/dionaea/services-enabled/
 
 # ---------- Certificados ----------
 nginx/certs/
@@ -39,3 +37,5 @@ Thumbs.db
 # ---------- Python ----------
 __pycache__/
 .pytest_cache/
+!dionaea/python/
+!dionaea/python/*.py

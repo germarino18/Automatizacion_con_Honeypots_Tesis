@@ -198,10 +198,10 @@ Nuestro bind-mount `./dionaea/config:/opt/dionaea/etc` hace que `etc/dionaea` EX
 | `smb` | 445 (✓ compose) | ✅ **Sí** | El rey del malware en Windows (gusans EternalBlue, ransomware) |
 | `ftp` | 21 (✓ compose) | ✅ **Sí** | Bots dropean payloads vía FTP |
 | `http` | 80 (✓ compose) | ✅ **Sí** | Emula servidor web; captura requests de explotación |
-| `mssql` | 1433 (✗ compose) | ⚠️ Conveniente | Favorita de ransomware moderno (REvil, LockBit) — requiere agregar puerto al compose + `.env` |
+| `mssql` | 1433 (Agregado) | ✅ **Sí** | Favorita de ransomware moderno (REvil, LockBit). **Decidido incluir** (puerto 1433 verificado LIBRE en el host, 2026-08-12) — requiere `.env` (`DIONAEA_MSSQL_PORT=1433`) + mapeo en compose + copia de `mssql.yaml` |
 | resto (epmap, sip, upnp, mongo...) | — | ❌ No | Ruido, bajo valor de captura |
 
-**Regla de oro:** un servicio sin puerto mapeado en el compose es plataforma perdida. Base = los 3 del compose; la única expansión considerada es `mssql` con su puerto nuevo.
+**Regla de oro:** un servicio sin puerto mapeado en el compose es plataforma perdida. Base = los 4 del compose: `smb` (445), `ftp` (21), `http` (80), `mssql` (1433).
 
 **Ihandlers a habilitar (`ihandlers-enabled/`):**
 
@@ -222,8 +222,10 @@ Nuestro bind-mount `./dionaea/config:/opt/dionaea/etc` hace que `etc/dionaea` EX
 - name: log_json
   config:
     handlers:
-      - file://var/log/dionaea/dionaea.json
+      - file:///opt/dionaea/var/log/dionaea/dionaea.json
 ```
+
+**Gotcha de URL `file://` (verificado 2026-08-12):** `urlparse('file://var/log/...')` interpreta `var` como **host** (`netloc`), produciendo el path absoluto `/log/dionaea/dionaea.json` → el FileHandler lanza `Unable to open file /log/dionaea/dionaea.json` (error crítico en el arranque). La URL correcta es **triple-slash** `file:///opt/dionaea/var/log/...` → `urlparse` da el path absoluto completo del contenedor, que coincide con el bind-mount `./dionaea/logs:/opt/dionaea/var/log`. El sidecar lee `dionaea/logs/dionaea/dionaea.json`.
 
 **Política de captura de malware (decisión del usuario):**
 
@@ -234,6 +236,59 @@ Nuestro bind-mount `./dionaea/config:/opt/dionaea/etc` hace que `etc/dionaea` EX
 **Discrepancia de rutas de binarios (hallazgo):** el compose monta `./dionaea/binaries:/opt/dionaea/var/dionaea/binaries` pero el cfg tiene `download.dir=var/lib/dionaea/binaries/` → los binarios caerían en un volumen anónimo, NO al host. **Se deja SIN corregir** — es una contención de facto: aunque algo se descargue, no llega al filesystem del host. Documentado como mitigación adicional (no como mecanismo de seguridad formal).
 
 **Versionado:** los 2 directorios `*-enabled` están en `.gitignore` hoy — se deben **sacar del ignore** para versionarlos (repo público, config reproducible).
+
+### Decisión 8: HALLAZGO — `log_json` NO emite eventos de descarga; fork mínimo del handler
+
+**Hallazgo verificado en código (2026-08-12, explore):** el `log_json.py` de la imagen (`/opt/dionaea/lib/dionaea/python/dionaea/log_json.py`) **solo serializa eventos de conexión** (`dionaea.connection.*`), credenciales (ftp/mssql/mysql login), comandos FTP y p0f. **NO tiene manejador para `dionaea.download.offer` / `dionaea.download.complete` / `dionaea.download.complete.hash`** — el hash del binario capturado circula internamente por incidentes (lo maneja `store.py`), pero jamás llega al `dionaea.json`.
+
+**Implicación:** aunque la descarga TFTP del EICAR tenga éxito y `store` guarde el binario, el sidecar → n8n → PostgreSQL **NUNCA vería `download.sha256`** en el payload. El mapeo `malware_hash ← download.sha256` de la Decisión 4 quedaría siempre NULL.
+
+**Elegido: fork mínimo de `log_json.py`** (montado como bind-mount sobre la imagen):
+
+- Copiar `log_json.py` del contenedor a `dionaea/python/log_json.py`
+- Agregar UN manejador (~20 líneas): `handle_incident_dionaea_download_complete_hash` → serializa `download` con `{md5, url, file}` (el binario con nombre = md5, ya que `store.py` usa `md5file`, no sha256) asociado a la conexión (`icd.con` como en las credenciales)
+- Montar en compose: `./dionaea/python/log_json.py:/opt/dionaea/lib/dionaea/python/dionaea/log_json.py` (bind-mount de archivo)
+- NO se toca el sidecar, los workflows n8n ni el esquema PostgreSQL — el payload de conexión simplemente llega enriquecido con la sección `download`
+
+**Nota técnica:** `store.py` calcula **MD5** (`md5file`), no SHA256. El fork expone ese MD5 como `download.md5`; el schema `honeypot_events.malware_hash` lo recibe. Se documenta que la imagen entrega MD5 — suficiente para la tesis (identificación + verificación contra el EICAR).
+
+**Nota de trigger (Opción B):** el incidente `dionaea.download.offer` (que dispara `tftp_download.py`) se origina en ataques REALES vía el módulo `emu` emulando shellcode que ejecuta `tftp.exe -i <host> get <file>`, o por reporte interno de script python dentro del daemon. No es alcanzable por curl externo. La prueba EICAR controlada usa un **perfil de emulación conocido** (`dionaea.module.emu.profile` con `CreateProcess("tftp.exe -i ... get ...")` — el patrón de la doc oficial) para que la descarga salga del servidor TFTP local que nosotros controlamos. Ver 6.7.4.
+
+### Decisión 8b: HALLAZGO — bug upstream en `tftp.py` rompe la descarga TFTP; fork mínimo
+
+**Hallazgo verificado en código (2026-08-12, apply):** al inspeccionar el `tftp.py` de la imagen (`/opt/dionaea/lib/dionaea/python/dionaea/tftp.py`, handler `handle_established`, ~línea 928), el código accede a `g_dionaea.config()['downloads']` — **formato viejo de la config, ya eliminado en la imagen actual** → lanza `KeyError` en runtime. Ese tramo es exactamente el que crea el archivo temporal del binario que `store`/`tftp_download` luego mueven, así que **ninguna descarga TFTP puede completarse con la imagen stock** aunque el trigger (Dionaea Offer) se dispare.
+
+Verificado por dónde se busca la clave: `store.py` usa el formato nuevo `g_dionaea.config()['dionaea']['download.dir']` (el que sí existe en la imagen). Discordancia upstream: `tftp.py` quedó con el acceso viejo.
+
+**Elegido: fork mínimo de `tftp.py`** (mismo patrón que la Decisión 8, bind-mount de archivo):
+
+- Copiar `tftp.py` del contenedor a `dionaea/python/tftp.py`
+- Reemplazar el acceso roto `g_dionaea.config()['downloads']` por `g_dionaea.config()['dionaea']['download.dir']` (misma clave que usa `store.py`), con `suffix='.tmp'` (mínimo cambio, respeta el flujo de `tftp_download.py` que mueve del `.tmp` al destino). Respetando exactamente el estilo del archivo
+- Montar en compose: `./dionaea/python/tftp.py:/opt/dionaea/lib/dionaea/python/dionaea/tftp.py`
+- Compilado y validado contra Python 3.6.9 del contenedor (`py_compile` OK)
+- NO se toca el sidecar ni los workflows — solo desbloquea la cadena de descarga que la prueba EICAR de 6.7.5 necesita
+
+**Nota:** si `download.dir` no estuviera configurado devolvería `None` y `NamedTemporaryFile(dir=None)` cae al tempdir del sistema — sin crash, contenido de facto. La imagen siempre lo define (`download.dir=var/lib/dionaea/binaries/`).
+
+### Resultado de la prueba EICAR (6.7.5) — verificado 2026-08-13
+
+Prueba de extremo a extremo con EICAR ACCEPTADA. La cadena completa se disparó con **trigger real** (no simulación directa):
+
+1. Shellcode x86-32 real (GetPC + burn loop) enviado al servicio **mssqld:1433**.
+2. El módulo **emu** de dionaea lo detecta (`shellcode found offset 0`), lo emula y perfila la llamada **`WinExec("tftp.exe -i 172.20.0.7 get eicar.txt")`** (`dionaea.module.emu.profile` + `profiledump`).
+3. Se emite **`dionaea.download.offer`** con `url: tftp://172.20.0.7/eicar.txt`.
+4. El fork de **`tftp.py`** (Decisión 8b) hace `do download` / `Connecting to 172.20.0.7 to download`, descarga el EICAR del servidor TFTP local.
+5. El handler **`store`** (temporal) guarda el binario y emite `dionaea.download.complete` → `.hash` → `.unique`; `md5file` confirma **MD5=`44d88612fea8a8f36de82e1278abb02f`** (el hash canónico del EICAR).
+6. El fork de **`log_json.py`** (Decisión 8) serializa `download.md5` en `dionaea.json` (payload con `md5`, `url`, `file`).
+7. **sidecar** → n8n (`PB-DIONAEA-v1.0`) → PostgreSQL `honeypot_events` fila **id=53** con `source_honeypot='dionaea'`, `src_ip=172.20.0.1`, `dst_port=1433`, `protocol=mssqld`, `malware_hash=44d88612fea8a8f36de82e1278abb02f`, `playbook_id=PB-DIONAEA-v1.0`, `att_ck_technique=T1190` (fila id=52 registra el cliente TFTP `172.20.0.7`).
+
+**Gotchas documentados en la prueba:**
+
+- **Log congelado dentro del contenedor:** con Docker Desktop + bind-mount, `docker exec ... dionaea.log` muestra el archivo CONGELADO a mitad de línea (stale mount). El log vivo es el del HOST: `dionaea/logs/dionaea/dionaea.log`. Siempre leer desde el host.
+- **`download.dir` relativo:** el cfg tiene `download.dir=var/lib/dionaea/binaries/` (ruta relativa) → el binario cae en `/opt/dionaea/var/lib/dionaea/binaries/` DENTRO del contenedor, NO en el bind `./dionaea/binaries:/opt/dionaea/var/dionaea/binaries`. Decisión 7 lo documenta como contención de facto; confirmado en la prueba.
+- **Causa raíz del eslabón faltante pre-prueba:** `store.yaml`/`tftp_download.yaml` se crearon DESPUÉS del primer arranque del contenedor y dionaea solo lee los `ihandler_configs` al iniciar → los handlers nunca se cargaron. Se resolvió con `docker compose up -d --force-recreate dionaea`.
+
+**Limpieza post-prueba (metadata-only, política Decisión 7):** `store.yaml` y `tftp_download.yaml` removidos de `dionaea/config/dionaea/ihandlers-enabled/` (quedan solo `emuprofile`, `log_json`, `ftp`); contenedor auxiliar `tftp-eicar` eliminado; `soc-dionaea` recreado y verificado con binds 445/21/80/1433 y SIN store/tftp_download en el arranque.
 
 ## Risks / Trade-offs
 
@@ -255,4 +310,9 @@ Nuestro bind-mount `./dionaea/config:/opt/dionaea/etc` hace que `etc/dionaea` EX
 | Dionaea expuesto a internet captura malware REAL | Alto | Política Decisión 7: `store` OFF por defecto → metadata-only; binarios caen en volumen anónimo (ruta de descargas sin bind-mount) → nunca al host |
 | Los `*-enabled` de dionaea en `.gitignore` no se versionan | Medio | Sacar los 2 directorios del `.gitignore` y commitear los yaml habilitados (Decisión 7) |
 | Symlinks en `*-enabled` (estilo imagen) se rompen en Windows/OneDrive | Medio | Usar copias reales de los `.yaml`, no symlinks (Decisión 7) |
-| `log_json` apunta a `var/lib/...` fuera del bind-mount | Alto | Reescribir el handler a `file://var/log/dionaea/dionaea.json` (Decisión 7) |
+| `log_json` apunta a `var/lib/...` fuera del bind-mount | Alto | Reescribir el handler a `file:///opt/dionaea/var/log/dionaea/dionaea.json` (triple-slash, Decisión 7) |
+| `log_json` NO emite eventos de descarga (hallazgo) | Alto | Fork mínimo de `log_json.py` con manejador `download.complete.hash` (Decisión 8) |
+| El trigger de descarga no es alcanzable por curl (solo emu/shellcode o python interno) | Medio | Prueba EICAR con perfil de emulación `CreateProcess("tftp.exe ...")` contra el servicio local (6.7.4) |
+| El binario capturado se guarda con nombre = MD5 (`store.py` usa `md5file`) | Bajo | Documentar; `malware_hash` recibe MD5 — verificación contra EICAR por hash |
+| Fork montado sobre la imagen se pierde si dionaea reinicia SIN el bind-mount | Medio | El bind-mount está en compose; el archivo versionado en `dionaea/python/log_json.py` |
+| Bug upstream en `tftp.py`: `KeyError` en `handle_established` rompe TODA descarga TFTP | Alto | Fork mínimo de `tftp.py` con acceso `['dionaea']['download.dir']` (Decisión 8b); bind-mount en compose |

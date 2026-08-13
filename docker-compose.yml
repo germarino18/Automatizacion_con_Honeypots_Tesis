@@ -107,10 +107,13 @@ services:
       - ./dionaea/config:/opt/dionaea/etc
       - ./dionaea/logs:/opt/dionaea/var/log
       - ./dionaea/binaries:/opt/dionaea/var/dionaea/binaries
+      - ./dionaea/python/log_json.py:/opt/dionaea/lib/dionaea/python/dionaea/log_json.py
+      - ./dionaea/python/tftp.py:/opt/dionaea/lib/dionaea/python/dionaea/tftp.py
     ports:
       - "${DIONAEA_SMB_PORT}:445"
       - "${DIONAEA_FTP_PORT}:21"
       - "${DIONAEA_HTTP_PORT}:80"
+      - "${DIONAEA_MSSQL_PORT}:1433"
     networks:
       - red_dmz
       - red_interna
