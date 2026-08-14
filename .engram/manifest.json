@@ -64,6 +64,14 @@
       "sessions": 1,
       "memories": 3,
       "prompts": 10
+    },
+    {
+      "id": "2efdde1f",
+      "created_by": "navar",
+      "created_at": "2026-08-14T01:57:24Z",
+      "sessions": 1,
+      "memories": 5,
+      "prompts": 9
     }
   ]
 }
