@@ -1,0 +1,26 @@
+# ===========================================
+# DATASOURCE - PostgreSQL (Honeypots)
+# Tesis: Automatización con Honeypots
+# ===========================================
+# Las credenciales se referencian por NOMBRE de variable de entorno
+# (resueltas por Grafana en runtime desde el entorno del contenedor).
+# NO se commitean valores literales. Las variables POSTGRES_* se inyectan
+# al servicio grafana desde docker-compose.yml (design D2).
+apiVersion: 1
+
+datasources:
+  - name: PostgreSQL - Honeypots
+    uid: postgres-honeypots
+    type: postgres
+    access: proxy
+    url: postgres:5432
+    user: ${POSTGRES_USER}
+    isDefault: true
+    editable: false
+    jsonData:
+      database: ${POSTGRES_DB}
+      sslmode: disable
+      postgresVersion: 1500
+      timescaledb: false
+    secureJsonData:
+      password: ${POSTGRES_PASSWORD}

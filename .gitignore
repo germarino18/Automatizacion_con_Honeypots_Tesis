@@ -10,7 +10,14 @@
 # ---------- Datos de Servicios (volúmenes) ----------
 postgres/data/
 n8n/data/
-grafana/
+grafana/*
+# ...pero SE versionan provisioning y dashboards (GitOps, design D5b).
+# Nota: se usa `grafana/*` (no `grafana/`) para que git pueda descender y
+# re-incluir las subcarpetas versionables; el runtime DB grafana.db sigue ignorado.
+!grafana/provisioning/
+!grafana/provisioning/**
+!grafana/dashboards/
+!grafana/dashboards/**
 
 # ---------- Logs de Honeypots ----------
 cowrie/logs/

@@ -1,0 +1,19 @@
+# ===========================================
+# PROVIDER DE DASHBOARDS - Honeypots
+# Tesis: Automatización con Honeypots
+# ===========================================
+# Los dashboards versionables viven en /var/lib/grafana/dashboards
+# (bind-mount ./grafana/dashboards) y se re-escanean cada 30s.
+apiVersion: 1
+
+providers:
+  - name: honeypots
+    orgId: 1
+    folder: ''
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false
