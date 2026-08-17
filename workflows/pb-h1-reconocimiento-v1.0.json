@@ -325,7 +325,7 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ JSON.stringify({ status: 'processed', event_id: $json['src_ip'] + '-' + $json['timestamp'] }) }}",
+        "responseBody": "={{ JSON.stringify({ status: 'processed', event_id: $json['event_id'] || ($json['src_ip'] + '-' + $json['timestamp']) }) }}",
         "options": {}
       },
       "id": "respond-webhook",
@@ -333,6 +333,18 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
       "position": [2250, 300]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Merge: output de PostgreSQL (con event_id) + campos completos de Normalizar\nconst pgItem = $input.all()[0].json || {};\nconst normalizedItems = $('Normalizar Datos').all() || [];\nconst norm = (normalizedItems[0] && normalizedItems[0].json) ? normalizedItems[0].json : {};\n\nreturn [{\n  json: {\n    ...norm,\n    event_id: pgItem.id\n  }\n}];"
+      },
+      "id": "merge-event-id",
+      "name": "Merge Event ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2250, 520]
     }
   ],
   "connections": {
@@ -352,11 +364,6 @@
         [
           {
             "node": "PostgreSQL Auditoría",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "¿Comando Ejecutado?",
             "type": "main",
             "index": 0
           },
@@ -467,6 +474,22 @@
     "PostgreSQL Auditoría": {
       "main": [
         [
+          {
+            "node": "Merge Event ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Event ID": {
+      "main": [
+        [
+          {
+            "node": "¿Comando Ejecutado?",
+            "type": "main",
+            "index": 0
+          },
           {
             "node": "Responder Webhook",
             "type": "main",

@@ -144,6 +144,7 @@ services:
       - "${GRAFANA_PORT:-3000}:3000"
     networks:
       - red_interna
+      - red_dmz
     depends_on:
       postgres:
         condition: service_healthy
