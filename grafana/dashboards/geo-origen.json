@@ -1,19 +1,28 @@
 {
   "uid": "geo-origen",
   "title": "Origen geográfico",
-  "tags": ["honeypot", "geo"],
+  "tags": [
+    "honeypot",
+    "geo"
+  ],
   "refresh": "30s",
   "schemaVersion": 39,
   "version": 1,
   "timezone": "browser",
-  "time": { "from": "now-7d", "to": "now" },
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
   "templating": {
     "list": [
       {
         "name": "honeypot",
         "label": "Honeypot",
         "type": "query",
-        "datasource": { "type": "postgres", "uid": "postgres-honeypots" },
+        "datasource": {
+          "type": "postgres",
+          "uid": "postgres-honeypots"
+        },
         "query": "SELECT DISTINCT source_honeypot FROM honeypot_events ORDER BY source_honeypot",
         "includeAll": true,
         "allValue": null,
@@ -29,21 +38,42 @@
       "id": 1,
       "type": "geomap",
       "title": "Mapa por país de origen",
-      "datasource": { "type": "postgres", "uid": "postgres-honeypots" },
+      "datasource": {
+        "type": "postgres",
+        "uid": "postgres-honeypots"
+      },
       "description": "Best-effort: agrupa eventos por país extraído de enrichment_data (JSONB). Sin data geo, el mapa queda vacío sin errores. Columna 'lookup' + gazetteer 'countries'.",
-      "gridPos": { "h": 14, "w": 12, "x": 0, "y": 0 },
+      "gridPos": {
+        "h": 14,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
       "targets": [
         {
           "refId": "A",
           "format": "table",
-          "rawSql": "SELECT COALESCE(enrichment_data->>'country', '') AS lookup, COUNT(*) AS value FROM honeypot_events WHERE $__timeFilter(timestamp) $__conditionalAll($honeypot, AND source_honeypot IN ($honeypot)) GROUP BY 1 ORDER BY value DESC",
-          "datasource": { "type": "postgres", "uid": "postgres-honeypots" }
+          "rawSql": "SELECT COALESCE(enrichment_data->>'country', '') AS lookup, COUNT(*) AS value FROM honeypot_events WHERE $__timeFilter(timestamp) AND source_honeypot IN (${honeypot:sqlstring}) GROUP BY 1 ORDER BY value DESC",
+          "datasource": {
+            "type": "postgres",
+            "uid": "postgres-honeypots"
+          }
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": { "mode": "absolute", "steps": [ { "color": "blue", "value": null } ] },
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
           "unit": "none"
         },
         "overrides": []
@@ -60,14 +90,21 @@
             "name": "Origen",
             "config": {
               "showLegend": true,
-              "style": { "color": "blue", "opacity": 0.6, "size": 10 }
+              "style": {
+                "color": "blue",
+                "opacity": 0.6,
+                "size": 10
+              }
             },
             "location": {
               "mode": "lookup",
               "lookup": "lookup",
               "gazetteer": "countries"
             },
-            "tooltip": { "mode": "details", "type": "list" }
+            "tooltip": {
+              "mode": "details",
+              "type": "list"
+            }
           }
         ],
         "view": {
@@ -82,68 +119,144 @@
       "id": 2,
       "type": "table",
       "title": "Top países",
-      "datasource": { "type": "postgres", "uid": "postgres-honeypots" },
+      "datasource": {
+        "type": "postgres",
+        "uid": "postgres-honeypots"
+      },
       "description": "Conteo por país desde enrichment_data. Los eventos sin data geo caen en 'Desconocido' (best-effort).",
-      "gridPos": { "h": 14, "w": 6, "x": 12, "y": 0 },
+      "gridPos": {
+        "h": 14,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
       "targets": [
         {
           "refId": "A",
           "format": "table",
-          "rawSql": "SELECT COALESCE(enrichment_data->>'country', 'Desconocido') AS pais, COUNT(*) AS eventos FROM honeypot_events WHERE $__timeFilter(timestamp) $__conditionalAll($honeypot, AND source_honeypot IN ($honeypot)) GROUP BY 1 ORDER BY eventos DESC",
-          "datasource": { "type": "postgres", "uid": "postgres-honeypots" }
+          "rawSql": "SELECT COALESCE(enrichment_data->>'country', 'Desconocido') AS pais, COUNT(*) AS eventos FROM honeypot_events WHERE $__timeFilter(timestamp) AND source_honeypot IN (${honeypot:sqlstring}) GROUP BY 1 ORDER BY eventos DESC",
+          "datasource": {
+            "type": "postgres",
+            "uid": "postgres-honeypots"
+          }
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "inspect": false },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
           "unit": "none"
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "pais" },
-            "properties": [ { "id": "custom.width", "value": 200 } ]
+            "matcher": {
+              "id": "byName",
+              "options": "pais"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 200
+              }
+            ]
           }
         ]
       },
       "options": {
         "cellHeight": "sm",
-        "footer": { "countRows": false, "enablePagination": true, "fields": "", "reducer": ["sum"], "show": false },
+        "footer": {
+          "countRows": false,
+          "enablePagination": true,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
         "showHeader": true,
-        "sortBy": [ { "displayName": "eventos", "desc": true } ]
+        "sortBy": [
+          {
+            "displayName": "eventos",
+            "desc": true
+          }
+        ]
       }
     },
     {
       "id": 3,
       "type": "table",
       "title": "Top src_ip (fallback)",
-      "datasource": { "type": "postgres", "uid": "postgres-honeypots" },
+      "datasource": {
+        "type": "postgres",
+        "uid": "postgres-honeypots"
+      },
       "description": "Fallback cuando no hay data geo en enrichment_data: muestra las IPs de origen más activas.",
-      "gridPos": { "h": 14, "w": 6, "x": 18, "y": 0 },
+      "gridPos": {
+        "h": 14,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
       "targets": [
         {
           "refId": "A",
           "format": "table",
-          "rawSql": "SELECT src_ip, COUNT(*) AS eventos FROM honeypot_events WHERE $__timeFilter(timestamp) $__conditionalAll($honeypot, AND source_honeypot IN ($honeypot)) GROUP BY src_ip ORDER BY eventos DESC LIMIT 10",
-          "datasource": { "type": "postgres", "uid": "postgres-honeypots" }
+          "rawSql": "SELECT src_ip, COUNT(*) AS eventos FROM honeypot_events WHERE $__timeFilter(timestamp) AND source_honeypot IN (${honeypot:sqlstring}) GROUP BY src_ip ORDER BY eventos DESC LIMIT 10",
+          "datasource": {
+            "type": "postgres",
+            "uid": "postgres-honeypots"
+          }
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "inspect": false },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
           "unit": "none"
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "src_ip" },
-            "properties": [ { "id": "custom.width", "value": 200 } ]
+            "matcher": {
+              "id": "byName",
+              "options": "src_ip"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 200
+              }
+            ]
           }
         ]
       },
       "options": {
         "cellHeight": "sm",
-        "footer": { "countRows": false, "enablePagination": true, "fields": "", "reducer": ["sum"], "show": false },
+        "footer": {
+          "countRows": false,
+          "enablePagination": true,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
         "showHeader": true,
-        "sortBy": [ { "displayName": "eventos", "desc": true } ]
+        "sortBy": [
+          {
+            "displayName": "eventos",
+            "desc": true
+          }
+        ]
       }
     }
   ]
