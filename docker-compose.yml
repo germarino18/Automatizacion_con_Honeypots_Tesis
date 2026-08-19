@@ -58,7 +58,6 @@ services:
       - "5678:5678"
     networks:
       - red_interna
-      - red_dmz
     depends_on:
       postgres:
         condition: service_healthy
@@ -79,7 +78,6 @@ services:
     environment:
       - COWRIE_SSH_PORT=${COWRIE_SSH_PORT}
       - COWRIE_TELNET_PORT=${COWRIE_TELNET_PORT}
-      - COWRIE_OUTPUT_ENDPOINT=http://n8n:5678/webhook/cowrie
     volumes:
       - ./cowrie/config:/cowrie/cowrie-git/etc
       - ./cowrie/logs:/cowrie/cowrie-git/log
@@ -89,7 +87,6 @@ services:
       - "${COWRIE_TELNET_PORT}:2223"
     networks:
       - red_dmz
-      - red_interna
     depends_on:
       n8n:
         condition: service_started
@@ -101,8 +98,6 @@ services:
   dionaea:
     image: dinotools/dionaea:latest
     container_name: soc-dionaea
-    environment:
-      - DIONAEA_OUTPUT_ENDPOINT=http://n8n:5678/webhook/dionaea
     volumes:
       - ./dionaea/config:/opt/dionaea/etc
       - ./dionaea/logs:/opt/dionaea/var/log
@@ -116,7 +111,6 @@ services:
       - "${DIONAEA_MSSQL_PORT}:1433"
     networks:
       - red_dmz
-      - red_interna
     depends_on:
       n8n:
         condition: service_started
@@ -144,7 +138,6 @@ services:
       - "${GRAFANA_PORT:-3000}:3000"
     networks:
       - red_interna
-      - red_dmz
     depends_on:
       postgres:
         condition: service_healthy
@@ -164,7 +157,6 @@ services:
       - "443:443"
     networks:
       - red_interna
-      - red_dmz
     depends_on:
       - n8n
     restart: unless-stopped
@@ -187,7 +179,6 @@ services:
       - ./cowrie/logs:/logs/cowrie:ro
       - ./dionaea/logs:/logs/dionaea:ro
     networks:
-      - red_dmz
       - red_interna
     depends_on:
       n8n:
@@ -208,7 +199,6 @@ networks:
   red_interna:
     name: honeypot_internal
     driver: bridge
-    internal: true
     ipam:
       config:
         - subnet: ${NETWORK_INTERNAL_SUBNET}
