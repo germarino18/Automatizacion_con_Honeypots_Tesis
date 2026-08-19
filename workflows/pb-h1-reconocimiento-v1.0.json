@@ -161,7 +161,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://api.your-firewall.com/api/v1/block",
+        "url": "http://n8n:5678/webhook/firewall-block",
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
@@ -176,6 +176,10 @@
             {
               "name": "reason",
               "value": "Honeypot reconnaissance - PB-H1"
+            },
+            {
+              "name": "event_id",
+              "value": "={{ $json[\"event_id\"] }}"
             }
           ]
         },
@@ -186,12 +190,6 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
       "position": [1650, 200],
-      "credentials": {
-        "httpHeaderAuth": {
-          "id": "firewall-cred-001",
-          "name": "Firewall_API"
-        }
-      },
       "onError": "continueRegularOutput"
     },
     {
@@ -242,13 +240,25 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://your-glpi-instance.com/apirest.php/Ticket",
+        "url": "http://n8n:5678/webhook/glpi-ticket",
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
             {
-              "name": "input",
-              "value": "={\"name\": \"Honeypot Alert - {{ $json[\"src_ip\"] }}\", \"content\": \"IP: {{ $json[\"src_ip\"] }}\\nScore: {{ $json[\"risk_score\"] }}\\nTécnica ATT&CK: {{ $json[\"att_ck_technique\"] }}\", \"urgency\": \"3\"}"
+              "name": "name",
+              "value": "=Honeypot Alert - {{ $json[\"src_ip\"] }}"
+            },
+            {
+              "name": "content",
+              "value": "=IP: {{ $json[\"src_ip\"] }}\nScore: {{ $json[\"risk_score\"] }}\nTécnica ATT&CK: {{ $json[\"att_ck_technique\"] }}"
+            },
+            {
+              "name": "urgency",
+              "value": "3"
+            },
+            {
+              "name": "event_id",
+              "value": "={{ $json[\"event_id\"] }}"
             }
           ]
         },
@@ -259,9 +269,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
       "position": [1850, 400],
-      "credentials": {
-        "httpHeaderAuth": {
-          "id": "glpi-cred-001",
+      "onError": "continueRegularOutput"
+    }
           "name": "GLPI_API"
         }
       },

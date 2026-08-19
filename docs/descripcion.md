@@ -141,6 +141,41 @@ Permitiría:
 
 ---
 
+## Sistema de Scoring de Riesgo (Diseño en Dos Niveles)
+
+El sistema utiliza un modelo de scoring bifurcado para tomar decisiones de respuesta automática:
+
+### PB-H1: Score de Triage (Reconocimiento)
+
+- **Fuentes**: AbuseIPDB + Shodan
+- **Rango**: 0.0 – 1.0
+- **Uso**: Toma de decisiones inmediata (bloqueo, alerta, ticket)
+- **Persistencia**: NO se almacena en la base de datos
+
+El score de PB-H1 se calcula con datos parciales (información de reconocimiento) y sirve para clasificar la amenaza en tres niveles:
+- **≥ 0.8 (Alto)**: Bloqueo automático + alerta Slack crítica
+- **0.5 – 0.79 (Medio)**: Esperar aprobación humana (1 hora) + crear ticket
+- **< 0.5 (Bajo)**: Solo registro
+
+### PB-H2: Score Definitivo (Ejecución de Comandos)
+
+- **Fuentes**: VirusTotal + WHOIS + análisis de comandos
+- **Rango**: 0.0 – 1.0
+- **Uso**: Score final almacenado para consultas y dashboards
+- **Persistencia**: Sí, en `honeypot_events.risk_score`
+
+El score de PB-H2 se calcula con fuentes adicionales más exhaustivas y representa la evaluación definitiva de la amenaza.
+
+### Justificación del Diseño
+
+El risk_score de PB-H1 no se persiste porque:
+1. PB-H1 y PB-H2 utilizan modelos de scoring diferentes (fuentes distintas, umbrales distintos)
+2. Mezclar ambos scores en la misma columna generaría confusión
+3. El score de PB-H1 es un indicador de triage, no la evaluación final
+4. La tabla `responses` ya registra la acción tomada con su justificación
+
+---
+
 ## Módulo de Simulación
 
 Se puede desarrollar un entorno controlado para:

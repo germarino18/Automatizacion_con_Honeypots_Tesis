@@ -1,0 +1,76 @@
+{
+  "name": "SOC - GLPI Ticket Endpoint",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "glpi-ticket",
+        "responseMode": "responseNode",
+        "webhookId": "glpi-ticket"
+      },
+      "id": "webhook-ticket",
+      "name": "Webhook Ticket",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO responses (event_id, action_type, actor, status, details)\nVALUES (\n  {{ $json[\"event_id\"] || null }},\n  'alerta',\n  'n8n-automated',\n  'completed',\n  jsonb_build_object(\n    'ticket_name', '{{ $json[\"name\"] }}',\n    'content', '{{ $json[\"content\"] }}',\n    'urgency', '{{ $json[\"urgency\"] }}',\n    'created_at', now()::text\n  )\n)\nRETURNING id, timestamp",
+        "options": {}
+      },
+      "id": "crear-ticket",
+      "name": "Crear Ticket",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [450, 300],
+      "credentials": {
+        "postgres": {
+          "id": "POSTGRES_CREDENTIAL_ID",
+          "name": "PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, message: \"Ticket created\", action_id: $json.id, timestamp: $json.timestamp }) }}"
+      },
+      "id": "responder",
+      "name": "Responder",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [650, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Ticket": {
+      "main": [
+        [
+          {
+            "node": "Crear Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Crear Ticket": {
+      "main": [
+        [
+          {
+            "node": "Responder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

@@ -1,0 +1,83 @@
+{
+  "name": "SOC - Firewall Block Endpoint",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "firewall-block",
+        "responseMode": "responseNode",
+        "options": {},
+        "webhookId": "firewall-block"
+      },
+      "id": "c1a2b3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+      "name": "Webhook Block",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "firewall-block"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO responses (event_id, action_type, actor, status, details)\nVALUES (\n  {{ $json[\"event_id\"] || null }},\n  'bloqueo',\n  'n8n-automated',\n  'completed',\n  jsonb_build_object(\n    'ip', '{{ $json[\"ip\"] }}',\n    'duration', '{{ $json[\"duration\"] }}',\n    'reason', '{{ $json[\"reason\"] }}',\n    'executed_at', now()::text\n  )\n)\nRETURNING id, timestamp",
+        "options": {}
+      },
+      "id": "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c",
+      "name": "Registrar Bloqueo",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [450, 300],
+      "credentials": {
+        "postgres": {
+          "id": "placeholder",
+          "name": "PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, message: \"IP blocked\", action_id: $json.id, timestamp: $json.timestamp }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "a2b3c4d5-e6f7-4a8b-9c0d-1e2f3a4b5c6d",
+      "name": "Responder",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [650, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Block": {
+      "main": [
+        [
+          {
+            "node": "Registrar Bloqueo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registrar Bloqueo": {
+      "main": [
+        [
+          {
+            "node": "Responder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [],
+  "pinData": {},
+  "versionId": "1"
+}

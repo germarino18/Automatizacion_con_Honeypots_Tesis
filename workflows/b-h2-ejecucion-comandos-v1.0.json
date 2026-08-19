@@ -147,7 +147,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://api.your-firewall.com/api/v1/block",
+        "url": "http://n8n:5678/webhook/firewall-block",
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
@@ -162,6 +162,10 @@
             {
               "name": "reason",
               "value": "Malicious command execution - PB-H2"
+            },
+            {
+              "name": "event_id",
+              "value": "={{ $json[\"event_id\"] }}"
             }
           ]
         },
@@ -180,13 +184,25 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://your-glpi-instance.com/apirest.php/Ticket",
+        "url": "http://n8n:5678/webhook/glpi-ticket",
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
             {
-              "name": "input",
-              "value": "={\"name\": \"CRÍTICO - Comando Malicioso - {{ $json[\"src_ip\"] }}\", \"content\": \"IP: {{ $json[\"src_ip\"] }}\\nComando: {{ $json[\"commands\"] }}\\nScore: {{ $json[\"risk_score\"] }}\\nVT Detections: {{ $json[\"vt_detections\"] }}\", \"urgency\": \"5\"}"
+              "name": "name",
+              "value": "=CRÍTICO - Comando Malicioso - {{ $json[\"src_ip\"] }}"
+            },
+            {
+              "name": "content",
+              "value": "=IP: {{ $json[\"src_ip\"] }}\nComando: {{ $json[\"commands\"] }}\nScore: {{ $json[\"risk_score\"] }}\nVT Detections: {{ $json[\"vt_detections\"] }}"
+            },
+            {
+              "name": "urgency",
+              "value": "5"
+            },
+            {
+              "name": "event_id",
+              "value": "={{ $json[\"event_id\"] }}"
             }
           ]
         },
