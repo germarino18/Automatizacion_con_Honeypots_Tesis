@@ -104,6 +104,14 @@
       "sessions": 0,
       "memories": 1,
       "prompts": 1
+    },
+    {
+      "id": "50e8cdb0",
+      "created_by": "German",
+      "created_at": "2026-08-19T01:16:23Z",
+      "sessions": 0,
+      "memories": 1,
+      "prompts": 1
     }
   ]
 }
