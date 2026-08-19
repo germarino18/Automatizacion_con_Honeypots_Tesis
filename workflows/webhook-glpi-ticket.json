@@ -17,20 +17,16 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO responses (event_id, action_type, actor, status, details)\nVALUES (\n  {{ $json[\"event_id\"] || null }},\n  'alerta',\n  'n8n-automated',\n  'completed',\n  jsonb_build_object(\n    'ticket_name', '{{ $json[\"name\"] }}',\n    'content', '{{ $json[\"content\"] }}',\n    'urgency', '{{ $json[\"urgency\"] }}',\n    'created_at', now()::text\n  )\n)\nRETURNING id, timestamp",
-        "options": {}
+        "query": "INSERT INTO responses (event_id, action_type, actor, status, details)\nVALUES ($1, 'alerta', 'n8n-automated', 'completed',\n  jsonb_build_object(\n    'ticket_name', $2,\n    'content', $3,\n    'urgency', $4,\n    'created_at', now()::text\n  )\n)\nRETURNING id, timestamp",
+        "options": {
+          "queryReplacement": "={{ $json[\"event_id\"] || null }},={{ $json[\"name\"] }},={{ $json[\"content\"] }},={{ $json[\"urgency\"] }}"
+        }
       },
       "id": "crear-ticket",
       "name": "Crear Ticket",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2,
-      "position": [450, 300],
-      "credentials": {
-        "postgres": {
-          "id": "POSTGRES_CREDENTIAL_ID",
-          "name": "PostgreSQL"
-        }
-      }
+      "position": [450, 300]
     },
     {
       "parameters": {

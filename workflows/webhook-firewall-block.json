@@ -19,20 +19,16 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO responses (event_id, action_type, actor, status, details)\nVALUES (\n  {{ $json[\"event_id\"] || null }},\n  'bloqueo',\n  'n8n-automated',\n  'completed',\n  jsonb_build_object(\n    'ip', '{{ $json[\"ip\"] }}',\n    'duration', '{{ $json[\"duration\"] }}',\n    'reason', '{{ $json[\"reason\"] }}',\n    'executed_at', now()::text\n  )\n)\nRETURNING id, timestamp",
-        "options": {}
+        "query": "INSERT INTO responses (event_id, action_type, actor, status, details)\nVALUES ($1, 'bloqueo', 'n8n-automated', 'completed',\n  jsonb_build_object(\n    'ip', $2,\n    'duration', $3,\n    'reason', $4,\n    'executed_at', now()::text\n  )\n)\nRETURNING id, timestamp",
+        "options": {
+          "queryReplacement": "={{ $json[\"event_id\"] || null }},={{ $json[\"ip\"] }},={{ $json[\"duration\"] }},={{ $json[\"reason\"] }}"
+        }
       },
       "id": "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c",
       "name": "Registrar Bloqueo",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2,
-      "position": [450, 300],
-      "credentials": {
-        "postgres": {
-          "id": "placeholder",
-          "name": "PostgreSQL"
-        }
-      }
+      "position": [450, 300]
     },
     {
       "parameters": {
