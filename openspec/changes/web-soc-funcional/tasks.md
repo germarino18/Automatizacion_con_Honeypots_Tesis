@@ -67,18 +67,18 @@
 
 ## 8. Scaffolding del frontend (`web/`) + design system (design D2/D9, spec web-soc-ui)
 
-- [ ] 8.1 Crear proyecto Vite React-TS en `web/` (`npm create vite@latest` con template react-ts), estructura `src/` (components, screens, hooks, services, styles), `package.json` con `react-router-dom`, `@tanstack/react-query`, `recharts`, `react-simple-maps`, `d3-geo`
-- [ ] 8.2 Agregar `web/Dockerfile` multi-stage: stage build (node:20-alpine, `npm ci && npm run build`) → stage serve (nginx:alpine) con config mínima que sirve `dist/` y `try_files $uri /index.html` (fallback SPA)
-- [ ] 8.3 Crear `web/src/styles/tokens.css` con las CSS custom properties del design system Obsidian Sentinel (fondos `#0a0a0c`/`#0f172a`/`#1e293b`, accent `#06b6d4`, success `#10b981`, severidad `#ef4444`/`#f97316`/`#f59e0b`, radio 0.25rem, sidebar 240px) y utilidades de tipografía (Inter UI, JetBrains Mono telemetría) con fuentes woff2 locales
-- [ ] 8.4 Crear layout base: `App.tsx` con Router, `Sidebar` (240px con links a las 8 pantallas + estados de servicios desde health) y `Header` (usuario, logout)
-- [ ] 8.5 Crear `web/src/services/api.ts` (cliente fetch con base `/api/v1`, credenciales por cookie, manejo de 401 → redirect a login) y hooks de react-query para overview, events, mitre, geo, malware, iocs, automation, health
-- [ ] 8.6 Verificación de build: `docker build web` (o `npm run build` local) produce `dist/` sin errores y sirve `index.html` con el fallback SPA
+- [x] 8.1 Crear proyecto Vite React-TS en `web/` (`npm create vite@latest` con template react-ts), estructura `src/` (components, screens, hooks, services, styles), `package.json` con `react-router-dom`, `@tanstack/react-query`, `recharts`, `react-simple-maps`, `d3-geo`
+- [x] 8.2 Agregar `web/Dockerfile` multi-stage: stage build (node:20-alpine, `npm ci && npm run build`) → stage serve (nginx:alpine) con config mínima que sirve `dist/` y `try_files $uri /index.html` (fallback SPA)
+- [x] 8.3 Crear `web/src/styles/tokens.css` con las CSS custom properties del design system Obsidian Sentinel (fondos `#0a0a0c`/`#0f172a`/`#1e293b`, accent `#06b6d4`, success `#10b981`, severidad `#ef4444`/`#f97316`/`#f59e0b`, radio 0.25rem, sidebar 240px) y utilidades de tipografía (Inter UI, JetBrains Mono telemetría) con fuentes woff2 locales
+- [x] 8.4 Crear layout base: `App.tsx` con Router, `Sidebar` (240px con links a las 8 pantallas + estados de servicios desde health) y `Header` (usuario, logout)
+- [x] 8.5 Crear `web/src/services/api.ts` (cliente fetch con base `/api/v1`, credenciales por cookie, manejo de 401 → redirect a login) y hooks de react-query para overview, events, mitre, geo, malware, iocs, automation, health
+- [x] 8.6 Verificación de build: `docker build web` (o `npm run build` local) produce `dist/` sin errores y sirve `index.html` con el fallback SPA
 
 ## 9. Frontend — Flujo de login y protección de rutas (spec web-soc-ui)
 
-- [ ] 9.1 Pantalla `Login.tsx`: formulario usuario/contraseña que llama `POST /api/v1/auth/login` (credentials include), maneja error de credenciales en pantalla y redirige a `/` al éxito
-- [ ] 9.2 Contexto de sesión (`AuthContext`): estado autenticado, función logout (llama `POST /api/v1/auth/logout` y limpia estado), persistencia del estado durante la sesión
-- [ ] 9.3 Guard de rutas: `<RequireAuth>` que redirige a `/login` si no hay sesión; ruta 404 para rutas desconocidas
+- [x] 9.1 Pantalla `Login.tsx`: formulario usuario/contraseña que llama `POST /api/v1/auth/login` (credentials include), maneja error de credenciales en pantalla y redirige a `/` al éxito
+- [x] 9.2 Contexto de sesión (`AuthContext`): estado autenticado, función logout (llama `POST /api/v1/auth/logout` y limpia estado), persistencia del estado durante la sesión
+- [x] 9.3 Guard de rutas: `<RequireAuth>` que redirige a `/login` si no hay sesión; ruta 404 para rutas desconocidas
 - [ ] 9.4 Verificación manual: sin sesión → redirect a login; login válido → dashboard; logout → login; acceso a ruta protegida sin sesión → login
 
 ## 10. Frontend — Pantallas (spec web-soc-ui)

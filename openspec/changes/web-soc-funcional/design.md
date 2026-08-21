@@ -125,6 +125,16 @@ Solo se verifica/activa la importación de ambos en el n8n corriendo (UI o `n8n 
 
 - **Por qué**: simple, sin costo de servidor, y suficiente para la HU 10 (exportar CSV). Alternativa: endpoint `/export` con streaming server-side — se deja como mejora si el volumen lo amerita.
 
+### D11. Frontend: arquitectura feature-based, pnpm como gestor y login demo pre-llenado (Option A)
+
+**Elegido:** tres decisiones aplicadas durante la implementación de los grupos 8–9:
+
+1. **Estructura feature-based (Screaming Architecture)** en `web/src/`: `app/` (App con router+providers, entry `main.tsx`, vista 404), `features/<dominio>/` (cada feature posee su pantalla + sus hooks react-query privados: auth, overview, live-feed, events-explorer, mitre, geo-map, malware, automation), `components/` (UI compartida: Sidebar, Header, ScreenPlaceholder), `lib/` (cliente API `api.ts` + infraestructura transversal) y `styles/` (tokens/app CSS sin cambios). Convención: un hook vive junto a la feature que lo consume; solo lo verdaderamente cruzado sube a `lib/` o `components/`. Casos límite documentados: `useHealth.ts` → `lib/` (infraestructura de salud consumida por el Sidebar, no es UI); `useEvents.ts` → `events-explorer/` (el feed en vivo separará su parte SSE al implementarse en el grupo 10); `NoEncontrado.tsx` → `app/` (vista ligada al catch-all del router).
+2. **pnpm como package manager** (v11.1.2 fijada en `packageManager`): se elimina `package-lock.json`, se genera `pnpm-lock.yaml` y el build stage del `web/Dockerfile` usa corepack (`corepack enable && pnpm install --frozen-lockfile && pnpm run build`) sobre `node:20-alpine`; el stage de nginx queda intacto. Nota crítica: pnpm 11 ya NO lee overrides desde `package.json` (ni npm-style ni `pnpm.overrides`) — la configuración se movió a `pnpm-workspace.yaml`, por lo que el override de seguridad `d3-color ^3.1.0` vive allí (verificado con `pnpm why d3-color`: una única versión 3.1.0).
+3. **Login demo pre-llenado ("Option A")**: `features/auth/Login.tsx` pre-completa usuario/contraseña desde `VITE_SOC_DEMO_USER` / `VITE_SOC_DEMO_PASSWORD` (vacíos por defecto; ejemplo vacío versionado en `web/.env.example`). Los valores reales NUNCA se versionan: `.gitignore` raíz ya cubre `.env`/`.env.local` a cualquier profundidad. La sesión sigue siendo la cookie HttpOnly (D3): `AuthContext` sondea un endpoint protegido (`GET /overview`; `/health` es público y no sirve como sonda) para restaurar el estado al recargar, `RequireAuth` redirige a `/login` sin sesión mostrando estado "Verificando…" para evitar flash de login, y el logout del Header llama `POST /auth/logout` y limpia el contexto.
+
+- **Por qué**: la estructura feature-based mantiene cada dominio del SOC cohesivo y escalable para los grupos 10–12; pnpm da installs determinísticos más rápidos y lockfile estándar para CI/Docker; Option A elimina fricción en la demo evaluable de la tesis sin comprometer secretos (los campos editables permiten probar también credenciales erróneas y el error 401).
+
 ## Risks / Trade-offs
 
 - **[n8n caído al listar workflows/ejecuciones] → Mitigación**: la API degrada con `degraded: true` y lista vacía; la UI muestra estado degradado y deshabilita acciones. No falla la app completa.

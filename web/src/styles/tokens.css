@@ -1,0 +1,64 @@
+/*
+ * Design system "Obsidian Sentinel" — tokens del prototipo Stitch
+ * (Honeypot SOC: Threat Intelligence Platform).
+ *
+ * Fuentes woff2 LOCALES: Inter y JetBrains Mono se venden vía npm
+ * (@fontsource/inter, @fontsource/jetbrains-mono) y Vite las empaqueta
+ * en dist/assets. No hay CDN ni Google Fonts: la consola funciona en la
+ * red interna sin salida a internet. Los @font-face los emiten esos
+ * paquetes; aquí solo se declaran las pilas de fuentes y utilidades.
+ */
+
+:root {
+  /* Superficies (dark-first) */
+  --bg-base: #0a0a0c;
+  --bg-surface: #0f172a;
+  --bg-elevated: #1e293b;
+
+  /* Marca */
+  --accent: #06b6d4;
+  --accent-strong: #0891b2;
+  --accent-soft: rgba(6, 182, 212, 0.14);
+  --success: #10b981;
+  --success-soft: rgba(16, 185, 129, 0.14);
+
+  /* Severidad semántica */
+  --severity-critical: #ef4444;
+  --severity-high: #f97316;
+  --severity-medium: #f59e0b;
+  --severity-low: #64748b;
+
+  /* Texto */
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-faint: #64748b;
+
+  /* Bordes y sombras */
+  --border-subtle: #1e293b;
+  --border-strong: #334155;
+  --shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.5);
+
+  /* Geometría */
+  --radius: 0.25rem;
+  --sidebar-width: 240px;
+  --header-height: 56px;
+
+  /* Tipografía */
+  --font-ui:
+    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  --font-mono:
+    'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas,
+    'Liberation Mono', monospace;
+}
+
+/* Utilidades de tipografía: texto de UI */
+.font-ui {
+  font-family: var(--font-ui);
+}
+
+/* Utilidades de tipografía: telemetría (IPs, hashes, IDs MITRE, comandos) */
+.font-mono {
+  font-family: var(--font-mono);
+  font-feature-settings: 'liga' 0;
+}
