@@ -25,8 +25,7 @@ TEST_ENV = {
     "SOC_ADMIN_PASSWORD": "soc-admin-pass",
     "SOC_JWT_SECRET": "test-jwt-secret-only-for-ci-0123456789",
     "JWT_EXPIRES_MINUTES": "480",
-    "N8N_BASIC_AUTH_USER": "n8n-test-user",
-    "N8N_BASIC_AUTH_PASSWORD": "n8n-test-pass",
+    "N8N_API_KEY": "test-api-key-jwt",
     "N8N_INTERNAL_URL": "http://n8n:5678",
 }
 for _k, _v in TEST_ENV.items():

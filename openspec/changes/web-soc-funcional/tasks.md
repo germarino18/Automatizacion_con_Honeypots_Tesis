@@ -2,7 +2,7 @@
 
 - [x] 1.1 Crear estructura `api/` con `app/` (main, config, routers, repositories, services, schemas), `tests/`, `requirements.txt`, `Dockerfile`, `pytest.ini` y `.dockerignore`
 - [x] 1.2 Definir `api/requirements.txt`: `fastapi`, `uvicorn[standard]`, `asyncpg`, `PyJWT`, `httpx`, `python-dotenv`; separar dev deps (pytest, pytest-asyncio) en `requirements-dev.txt`
-- [x] 1.3 Crear `api/app/config.py` con Pydantic Settings que lea del entorno: `POSTGRES_*`, `SOC_ADMIN_USER`, `SOC_ADMIN_PASSWORD`, `SOC_JWT_SECRET`, `N8N_BASIC_AUTH_USER`, `N8N_BASIC_AUTH_PASSWORD`, `N8N_INTERNAL_URL`, `JWT_EXPIRES_MINUTES` (default 480) — sin valores literales de credenciales
+- [x] 1.3 Crear `api/app/config.py` con Pydantic Settings que lea del entorno: `POSTGRES_*`, `SOC_ADMIN_USER`, `SOC_ADMIN_PASSWORD`, `SOC_JWT_SECRET`, `N8N_API_KEY`, `N8N_INTERNAL_URL`, `JWT_EXPIRES_MINUTES` (default 480) — sin valores literales de credenciales
 - [x] 1.4 Crear `api/app/main.py` con la app FastAPI, CORS para localhost de desarrollo, router de health público y mounting de routers de API con prefijo `/api/v1`
 - [x] 1.5 Crear `api/app/db.py` con el pool de `asyncpg` (`postgresql://user:pass@postgres:5432/db` desde config) y función de init/shutdown del pool
 - [x] 1.6 `api/Dockerfile` multi-stage o directo (python:3.11-slim): instalar requirements, copiar `app/`, healthcheck `GET /api/v1/health`, CMD uvicorn `app.main:app` en `0.0.0.0:8000`
@@ -47,7 +47,7 @@
 
 ## 6. API — Integración con n8n (design D6, specs api-soc + automatizacion-web)
 
-- [x] 6.1 Crear `api/app/services/n8n_client.py` (httpx, Basic Auth con `N8N_BASIC_AUTH_*`): `list_workflows()` → `GET {N8N_INTERNAL_URL}/api/v1/workflows`, `list_executions()` → `GET {N8N_INTERNAL_URL}/api/v1/executions?limit=50`
+- [x] 6.1 Crear `api/app/services/n8n_client.py` (httpx, header `X-N8N-API-KEY` con `N8N_API_KEY`): `list_workflows()` → `GET {N8N_INTERNAL_URL}/api/v1/workflows`, `list_executions()` → `GET {N8N_INTERNAL_URL}/api/v1/executions?limit=50`
 - [x] 6.2 En `n8n_client.py`: `simulate(honeypot, payload)` → POST a `{N8N_INTERNAL_URL}/webhook/cowrie` o `/webhook/dionaea`; `block_ip(src_ip, event_id, reason, duration=None)` → POST a `{N8N_INTERNAL_URL}/webhook/firewall-block` con payload `{event_id, ip: src_ip, duration, reason}` (duration opcional/null); `create_ticket(event_id, name, content, urgency)` → POST a `{N8N_INTERNAL_URL}/webhook/glpi-ticket` con payload `{event_id, name, content, urgency}`; todos con timeout y captura de errores de conexión
 - [x] 6.3 Router `api/app/routers/automation.py` (protegido): `GET /api/v1/automation/workflows` (n8n caído → 502/503 sin datos falsos) y `GET /api/v1/automation/executions` (n8n caído → 200 con lista vacía + `degraded: true`), según spec automatizacion-web
 - [x] 6.4 Router `automation.py`: `POST /api/v1/automation/simulate` — valida `honeypot` (422 si no es cowrie/dionaea), delega a n8n, devuelve resultado del webhook; 502/503 si n8n falla sin reportar éxito
@@ -55,6 +55,7 @@
 - [x] 6.6 Router `automation.py`: `POST /api/v1/automation/create-ticket` — valida `name`/`content` (422 si vacíos), delega a `{N8N_INTERNAL_URL}/webhook/glpi-ticket`, devuelve resultado; 502/503 si n8n falla
 - [x] 6.7 Router `automation.py`: `GET /api/v1/automation/responses` con filtros — lee de `responses` (repositorio 3.7)
 - [x] 6.8 Tests de integración: mock de n8n (httpx MockTransport) para workflows/executions/simulate/block-ip/create-ticket OK y con n8n caído → degradación correcta; 422 con honeypot inválido, IP inválida y ticket sin `name`/`content`
+- [x] 6.9 Migración de autenticación de lecturas n8n: Basic Auth → header `X-N8N-API-KEY` (n8n 2.x eliminó Basic Auth de la API pública; key creada desde UI owner, guardada en `.env` como `N8N_API_KEY`; suite completa 162 tests green)
 
 ## 7. Verificación/activación de los workflows n8n existentes (design D6, spec automatizacion-web)
 
@@ -94,10 +95,10 @@
 
 ## 11. Despliegue en docker-compose y nginx (design D7, spec despliegue-web)
 
-- [ ] 11.1 Agregar servicio `api` a `docker-compose.yml`: build `./api`, container `soc-api`, red `red_interna`, `depends_on` postgres healthy, `environment` con `POSTGRES_*`, `SOC_ADMIN_*`, `SOC_JWT_SECRET`, `N8N_BASIC_AUTH_*`, `N8N_INTERNAL_URL=http://n8n:5678` — sin puerto publicado al host
+- [ ] 11.1 Agregar servicio `api` a `docker-compose.yml`: build `./api`, container `soc-api`, red `red_interna`, `depends_on` postgres healthy, `environment` con `POSTGRES_*`, `SOC_ADMIN_*`, `SOC_JWT_SECRET`, `N8N_API_KEY`, `N8N_INTERNAL_URL=http://n8n:5678` — sin puerto publicado al host
 - [ ] 11.2 Agregar servicio `web` a `docker-compose.yml`: build `./web`, container `soc-web`, red `red_interna`, `depends_on` api — sin puerto publicado al host
 - [ ] 11.3 Actualizar `nginx/nginx.conf`: upstreams `api_backend` (api:8000) y `web_backend` (web:80); `location /` → web (fallback SPA), `location /api/` → api con `proxy_buffering off` y headers X-Forwarded, mantener `location /webhook/` (n8n) y `location /grafana/` (grafana)
-- [ ] 11.4 Agregar a `.env` y `.env.example`: `SOC_ADMIN_USER`, `SOC_ADMIN_PASSWORD`, `SOC_JWT_SECRET` (placeholder vacío en `.env.example` con comentario de uso); documentar que `N8N_BASIC_AUTH_*` y `POSTGRES_*` ya existían
+- [ ] 11.4 Agregar a `.env` y `.env.example`: `SOC_ADMIN_USER`, `SOC_ADMIN_PASSWORD`, `SOC_JWT_SECRET` (placeholder vacío en `.env.example` con comentario de uso); documentar que `N8N_API_KEY` y `POSTGRES_*` ya existían
 - [ ] 11.5 Verificar `docker compose config` sin warnings de variables vacías y que `nginx` monta el mismo `nginx.conf` actualizado
 - [ ] 11.6 Grep de secretos: `git grep -iE "(SOC_ADMIN_PASSWORD|SOC_JWT_SECRET)=.+[A-Za-z0-9]{8,}"` NO debe arrojar valores reales (solo referencias en compose/env)
 

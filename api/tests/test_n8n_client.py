@@ -4,12 +4,13 @@ httpx MockTransport lets us exercise the real request-building code paths
 (URLs, auth headers, JSON payloads, error capture) without a running n8n.
 """
 
-import base64
 import json
+from functools import partial
 
 import httpx
 import pytest
 
+from app import config
 from app.services import n8n_client
 from tests.conftest import TEST_ENV
 
@@ -21,11 +22,11 @@ def _client(handler) -> httpx.AsyncClient:
     )
 
 
-def _authed_client(handler) -> httpx.AsyncClient:
-    return httpx.AsyncClient(
-        transport=httpx.MockTransport(handler),
-        base_url=TEST_ENV["N8N_INTERNAL_URL"],
-        auth=(TEST_ENV["N8N_BASIC_AUTH_USER"], TEST_ENV["N8N_BASIC_AUTH_PASSWORD"]),
+def _built_client(handler):
+    """build_client patched ONLY with a MockTransport: production header
+    logic (X-N8N-API-KEY) runs for real."""
+    return partial(
+        n8n_client.build_client, transport=httpx.MockTransport(handler)
     )
 
 
@@ -60,42 +61,101 @@ async def test_list_workflows_returns_data():
 
 
 @pytest.mark.asyncio
-async def test_list_workflows_sends_basic_auth(monkeypatch):
-    expected = base64.b64encode(
-        f"{TEST_ENV['N8N_BASIC_AUTH_USER']}:{TEST_ENV['N8N_BASIC_AUTH_PASSWORD']}".encode()
-    ).decode()
-
+async def test_list_workflows_sends_api_key_header(monkeypatch):
     async def handler(request):
-        assert request.headers["Authorization"] == f"Basic {expected}"
+        assert request.headers["X-N8N-API-KEY"] == TEST_ENV["N8N_API_KEY"]
         return httpx.Response(200, json={"data": []})
 
-    monkeypatch.setattr(n8n_client, "build_client", lambda **kw: _authed_client(handler))
+    monkeypatch.setattr(n8n_client, "build_client", _built_client(handler))
     await n8n_client.list_workflows()
 
 
 @pytest.mark.asyncio
-async def test_build_client_has_basic_auth():
-    client = n8n_client.build_client()
-    try:
-        request = httpx.Request(
-            "GET", TEST_ENV["N8N_INTERNAL_URL"] + "/api/v1/workflows"
-        )
-        authed_request = next(client.auth.auth_flow(request))
-        expected = base64.b64encode(
-            f"{TEST_ENV['N8N_BASIC_AUTH_USER']}:{TEST_ENV['N8N_BASIC_AUTH_PASSWORD']}".encode()
-        ).decode()
-        assert authed_request.headers["Authorization"] == f"Basic {expected}"
-    finally:
-        await client.aclose()
+async def test_list_executions_sends_api_key_header(monkeypatch):
+    async def handler(request):
+        assert request.headers["X-N8N-API-KEY"] == TEST_ENV["N8N_API_KEY"]
+        assert request.url.params["limit"] == "50"
+        return httpx.Response(200, json={"data": []})
+
+    monkeypatch.setattr(n8n_client, "build_client", _built_client(handler))
+    await n8n_client.list_executions()
 
 
 @pytest.mark.asyncio
-async def test_webhook_client_has_no_auth():
-    client = n8n_client.build_client(webhook=True)
+async def test_build_client_sets_api_key_header_when_configured():
+    captured = {}
+
+    def handler(request):
+        captured["headers"] = request.headers
+        return httpx.Response(200, json={"data": []})
+
+    client = n8n_client.build_client(transport=httpx.MockTransport(handler))
     try:
-        assert client.auth is None
+        resp = await client.get("/api/v1/workflows")
     finally:
         await client.aclose()
+
+    assert resp.status_code == 200
+    assert captured["headers"]["X-N8N-API-KEY"] == TEST_ENV["N8N_API_KEY"]
+
+
+@pytest.mark.asyncio
+async def test_build_client_without_api_key_omits_header(monkeypatch):
+    monkeypatch.setattr(config.settings, "n8n_api_key", "")
+    captured = {}
+
+    def handler(request):
+        captured["headers"] = request.headers
+        return httpx.Response(200, json={"data": []})
+
+    client = n8n_client.build_client(transport=httpx.MockTransport(handler))
+    try:
+        resp = await client.get("/api/v1/workflows")
+    finally:
+        await client.aclose()
+
+    assert resp.status_code == 200
+    assert "X-N8N-API-KEY" not in captured["headers"]
+
+
+@pytest.mark.asyncio
+async def test_webhook_client_has_no_api_key_header():
+    captured = {}
+
+    def handler(request):
+        captured["headers"] = request.headers
+        return httpx.Response(200, json={"success": True})
+
+    client = n8n_client.build_client(
+        webhook=True, transport=httpx.MockTransport(handler)
+    )
+    try:
+        resp = await client.post("/webhook/cowrie", json={})
+    finally:
+        await client.aclose()
+
+    assert resp.status_code == 200
+    assert "X-N8N-API-KEY" not in captured["headers"]
+
+
+@pytest.mark.asyncio
+async def test_simulate_via_built_webhook_client_never_sends_api_key(monkeypatch):
+    async def handler(request):
+        assert "X-N8N-API-KEY" not in request.headers
+        return httpx.Response(200, json={"success": True})
+
+    monkeypatch.setattr(
+        n8n_client,
+        "build_client",
+        partial(
+            n8n_client.build_client,
+            transport=httpx.MockTransport(handler),
+            webhook=True,
+        ),
+    )
+    result = await n8n_client.simulate("cowrie", {"src_ip": "1.2.3.4"})
+
+    assert result["success"] is True
 
 
 @pytest.mark.asyncio
@@ -135,6 +195,7 @@ async def test_simulate_cowrie_posts_payload_to_cowrie_webhook():
         assert request.method == "POST"
         assert json.loads(request.content) == payload
         assert "Authorization" not in request.headers
+        assert "X-N8N-API-KEY" not in request.headers
         return httpx.Response(200, json={"success": True})
 
     result = await n8n_client.simulate("cowrie", payload, client=_client(handler))

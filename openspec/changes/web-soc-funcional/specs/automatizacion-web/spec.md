@@ -1,10 +1,10 @@
 ## ADDED Requirements
 
 ### Requirement: La API SHALL listar los workflows de n8n
-El servicio `soc-api` SHALL exponer `GET /api/v1/automation/workflows` (protegido) que liste los workflows de n8n vía la API pública de n8n (`/api/v1/workflows`) usando `N8N_BASIC_AUTH_USER`/`N8N_BASIC_AUTH_PASSWORD` del entorno, devolviendo `id`, `name` y `active`.
+El servicio `soc-api` SHALL exponer `GET /api/v1/automation/workflows` (protegido) que liste los workflows de n8n vía la API pública de n8n (`/api/v1/workflows`) autenticando con el header `X-N8N-API-KEY` (desde `N8N_API_KEY` del entorno; n8n 2.x eliminó Basic Auth de su API pública), devolviendo `id`, `name` y `active`.
 
 #### Scenario: Listar workflows con n8n disponible
-- **WHEN** n8n responde a la API pública con credenciales válidas
+- **WHEN** n8n responde a la API pública con una API key válida
 - **THEN** la API devuelve HTTP 200 con la lista de workflows y su estado `active`
 - **AND** los workflows desactivados se marcan como tales en el payload
 

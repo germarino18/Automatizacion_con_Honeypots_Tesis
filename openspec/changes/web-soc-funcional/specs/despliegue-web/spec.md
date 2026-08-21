@@ -14,7 +14,7 @@ El servicio `api` (container `soc-api`) SHALL agregarse a `docker-compose.yml` c
 
 #### Scenario: Variables de entorno mínimas
 - **WHEN** se inspecciona el servicio `api` en compose
-- **THEN** recibe `POSTGRES_*`, `SOC_ADMIN_USER`, `SOC_ADMIN_PASSWORD`, `SOC_JWT_SECRET`, `N8N_BASIC_AUTH_USER`, `N8N_BASIC_AUTH_PASSWORD` y `N8N_INTERNAL_URL` desde el entorno
+- **THEN** recibe `POSTGRES_*`, `SOC_ADMIN_USER`, `SOC_ADMIN_PASSWORD`, `SOC_JWT_SECRET`, `N8N_API_KEY` y `N8N_INTERNAL_URL` desde el entorno
 - **AND** ningún valor de credencial aparece como literal en el repositorio
 
 ### Requirement: El servicio `web` SHALL construir y servir la SPA

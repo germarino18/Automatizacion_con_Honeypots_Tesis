@@ -3,7 +3,8 @@
 Two integration paths:
 
 * **Reads** (list_workflows / list_executions) use the n8n public API
-  (``/api/v1/...``) with Basic Auth from ``N8N_BASIC_AUTH_*``.
+  (``/api/v1/...``) with the ``X-N8N-API-KEY`` header from ``N8N_API_KEY``
+  (n8n 2.x removed Basic Auth from the public API).
 * **Actions** (simulate / block_ip / create_ticket) POST to the EXISTING
   webhook workflows (``/webhook/cowrie``, ``/webhook/dionaea``,
   ``/webhook/firewall-block``, ``/webhook/glpi-ticket``) exactly as the
@@ -44,20 +45,13 @@ def _base_url() -> str:
     return config.settings.n8n_internal_url.rstrip("/")
 
 
-def _basic_auth() -> tuple[str, str] | None:
-    user = config.settings.n8n_basic_auth_user
-    password = config.settings.n8n_basic_auth_password
-    if not user and not password:
-        return None
-    return (user, password)
-
-
 def build_client(*, transport=None, webhook: bool = False) -> httpx.AsyncClient:
     """Build an AsyncClient for the internal n8n URL.
 
-    Public-API reads send Basic Auth; webhook actions do not (matching the
-    existing sidecar -> n8n webhook calls). ``transport`` is injectable for
-    tests (httpx.MockTransport).
+    Public-API reads send the ``X-N8N-API-KEY`` header (from ``N8N_API_KEY``)
+    only when the key is configured; webhook actions never carry it (matching
+    the existing sidecar -> n8n webhook calls). ``transport`` is injectable
+    for tests (httpx.MockTransport).
     """
     kwargs: dict = {
         "base_url": _base_url(),
@@ -65,10 +59,8 @@ def build_client(*, transport=None, webhook: bool = False) -> httpx.AsyncClient:
     }
     if transport is not None:
         kwargs["transport"] = transport
-    if not webhook:
-        auth = _basic_auth()
-        if auth is not None:
-            kwargs["auth"] = auth
+    if not webhook and config.settings.n8n_api_key:
+        kwargs["headers"] = {"X-N8N-API-KEY": config.settings.n8n_api_key}
     return httpx.AsyncClient(**kwargs)
 
 
@@ -106,12 +98,12 @@ async def _request(
 
 
 async def list_workflows(client: httpx.AsyncClient | None = None) -> dict:
-    """GET {N8N_INTERNAL_URL}/api/v1/workflows (Basic Auth)."""
+    """GET {N8N_INTERNAL_URL}/api/v1/workflows (X-N8N-API-KEY)."""
     return await _request("get", "/api/v1/workflows", client=client)
 
 
 async def list_executions(client: httpx.AsyncClient | None = None) -> dict:
-    """GET {N8N_INTERNAL_URL}/api/v1/executions?limit=50 (Basic Auth)."""
+    """GET {N8N_INTERNAL_URL}/api/v1/executions?limit=50 (X-N8N-API-KEY)."""
     return await _request(
         "get",
         "/api/v1/executions",

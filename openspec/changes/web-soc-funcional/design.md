@@ -80,7 +80,7 @@ Stakeholders: operador SOC (monitoreo en tiempo real, respuesta), investigador (
 
 **Elegido:** dos vías de integración:
 
-1. **Lectura** (listar workflows/ejecuciones): la API usa la API pública de n8n (`GET /api/v1/workflows`, `GET /api/v1/executions`) con Basic Auth (`N8N_BASIC_AUTH_USER`/`N8N_BASIC_AUTH_PASSWORD`) vía `httpx` desde la `red_interna`.
+1. **Lectura** (listar workflows/ejecuciones): la API usa la API pública de n8n (`GET /api/v1/workflows`, `GET /api/v1/executions`) con el header `X-N8N-API-KEY` (desde `N8N_API_KEY`; n8n 2.x eliminó Basic Auth de la API pública) vía `httpx` desde la `red_interna`.
 2. **Escritura (acciones)**:
    - **Simular ataque**: `POST /api/v1/automation/simulate` → POST a `http://n8n:5678/webhook/cowrie` o `/webhook/dionaea` con payload de prueba → recorre la cadena REAL (workflow → INSERT → PostgreSQL).
    - **Bloquear IP**: `POST /api/v1/automation/block-ip` → POST a `http://n8n:5678/webhook/firewall-block` (workflow EXISTENTE `webhook-firewall-block.json`) → INSERT en `responses` (`action_type='bloqueo'`, `actor='n8n-automated'`). Mapeo de payload: la API recibe `{src_ip, event_id, reason}` y POSTea `{event_id, ip: src_ip, duration, reason}` (duration opcional/null, coincide con el contrato del workflow).
@@ -98,7 +98,7 @@ Solo se verifica/activa la importación de ambos en el n8n corriendo (UI o `n8n 
 ### D7. Despliegue: servicios `api` y `web` + nginx
 
 **Elegido:**
-- **`api`** (container `soc-api`): imagen `python:3.11-slim` construida desde `api/`, red `red_interna` (alcanza postgres y n8n), sin puerto publicado al host (solo nginx lo alcanza por red interna). Recibe `POSTGRES_*`, `SOC_ADMIN_USER`, `SOC_ADMIN_PASSWORD`, `SOC_JWT_SECRET`, `N8N_BASIC_AUTH_*`, `N8N_INTERNAL_URL=http://n8n:5678`. Healthcheck: `GET /api/v1/health`.
+- **`api`** (container `soc-api`): imagen `python:3.11-slim` construida desde `api/`, red `red_interna` (alcanza postgres y n8n), sin puerto publicado al host (solo nginx lo alcanza por red interna). Recibe `POSTGRES_*`, `SOC_ADMIN_USER`, `SOC_ADMIN_PASSWORD`, `SOC_JWT_SECRET`, `N8N_API_KEY`, `N8N_INTERNAL_URL=http://n8n:5678`. Healthcheck: `GET /api/v1/health`.
 - **`web`** (container `soc-web`): imagen `node:20-alpine` construida desde `web/` con build multi-stage (build → nginx:alpine sirviendo estáticos en el mismo contenedor). Sin puerto publicado; nginx lo alcanza por red interna. Fallback SPA con `try_files $uri /index.html`.
 - **`nginx`**: se actualiza `nginx/nginx.conf`:
   - `location /` → upstream `web` (SPA)
