@@ -1,0 +1,1 @@
+"""Data-access repositories over PostgreSQL (parameterized SQL only)."""

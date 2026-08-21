@@ -1,68 +1,68 @@
 ## 1. Scaffolding del backend API (`api/`)
 
-- [ ] 1.1 Crear estructura `api/` con `app/` (main, config, routers, repositories, services, schemas), `tests/`, `requirements.txt`, `Dockerfile`, `pytest.ini` y `.dockerignore`
-- [ ] 1.2 Definir `api/requirements.txt`: `fastapi`, `uvicorn[standard]`, `asyncpg`, `PyJWT`, `httpx`, `python-dotenv`; separar dev deps (pytest, pytest-asyncio) en `requirements-dev.txt`
-- [ ] 1.3 Crear `api/app/config.py` con Pydantic Settings que lea del entorno: `POSTGRES_*`, `SOC_ADMIN_USER`, `SOC_ADMIN_PASSWORD`, `SOC_JWT_SECRET`, `N8N_BASIC_AUTH_USER`, `N8N_BASIC_AUTH_PASSWORD`, `N8N_INTERNAL_URL`, `JWT_EXPIRES_MINUTES` (default 480) — sin valores literales de credenciales
-- [ ] 1.4 Crear `api/app/main.py` con la app FastAPI, CORS para localhost de desarrollo, router de health público y mounting de routers de API con prefijo `/api/v1`
-- [ ] 1.5 Crear `api/app/db.py` con el pool de `asyncpg` (`postgresql://user:pass@postgres:5432/db` desde config) y función de init/shutdown del pool
-- [ ] 1.6 `api/Dockerfile` multi-stage o directo (python:3.11-slim): instalar requirements, copiar `app/`, healthcheck `GET /api/v1/health`, CMD uvicorn `app.main:app` en `0.0.0.0:8000`
-- [ ] 1.7 Test de humo: `GET /api/v1/health` responde 200 con `status: ok` cuando el entorno de test usa un PostgreSQL de prueba (o SQLite/mock) — verifica que la app importa y arranca
+- [x] 1.1 Crear estructura `api/` con `app/` (main, config, routers, repositories, services, schemas), `tests/`, `requirements.txt`, `Dockerfile`, `pytest.ini` y `.dockerignore`
+- [x] 1.2 Definir `api/requirements.txt`: `fastapi`, `uvicorn[standard]`, `asyncpg`, `PyJWT`, `httpx`, `python-dotenv`; separar dev deps (pytest, pytest-asyncio) en `requirements-dev.txt`
+- [x] 1.3 Crear `api/app/config.py` con Pydantic Settings que lea del entorno: `POSTGRES_*`, `SOC_ADMIN_USER`, `SOC_ADMIN_PASSWORD`, `SOC_JWT_SECRET`, `N8N_BASIC_AUTH_USER`, `N8N_BASIC_AUTH_PASSWORD`, `N8N_INTERNAL_URL`, `JWT_EXPIRES_MINUTES` (default 480) — sin valores literales de credenciales
+- [x] 1.4 Crear `api/app/main.py` con la app FastAPI, CORS para localhost de desarrollo, router de health público y mounting de routers de API con prefijo `/api/v1`
+- [x] 1.5 Crear `api/app/db.py` con el pool de `asyncpg` (`postgresql://user:pass@postgres:5432/db` desde config) y función de init/shutdown del pool
+- [x] 1.6 `api/Dockerfile` multi-stage o directo (python:3.11-slim): instalar requirements, copiar `app/`, healthcheck `GET /api/v1/health`, CMD uvicorn `app.main:app` en `0.0.0.0:8000`
+- [x] 1.7 Test de humo: `GET /api/v1/health` responde 200 con `status: ok` cuando el entorno de test usa un PostgreSQL de prueba (o SQLite/mock) — verifica que la app importa y arranca
 
 ## 2. API — Autenticación por sesión JWT (design D3, spec api-soc)
 
-- [ ] 2.1 Crear `api/app/services/auth.py`: verificación de credenciales con comparación de tiempo constante contra `SOC_ADMIN_USER`/`SOC_ADMIN_PASSWORD`, emisión de JWT (sub, exp, iat) firmado con `SOC_JWT_SECRET`, y decode/validación
-- [ ] 2.2 Crear dependencia FastAPI `require_auth` que lea el token (cookie `session` o header `Authorization: Bearer`) y falle con HTTP 401 si es inválido/expirado/ausente
-- [ ] 2.3 Router `api/app/routers/auth.py`: `POST /api/v1/auth/login` (valida credenciales → setea cookie HttpOnly SameSite=Lax con el token → 200) y `POST /api/v1/auth/logout` (limpia cookie → 200)
-- [ ] 2.4 Test: login con credenciales correctas → 200 + token; incorrectas → 401 sin detalle de cuál campo falló; acceso a endpoint protegido sin token → 401; logout → 200
-- [ ] 2.5 Verificar que ningún log de la API imprime credenciales ni tokens (revisión de logging en login)
+- [x] 2.1 Crear `api/app/services/auth.py`: verificación de credenciales con comparación de tiempo constante contra `SOC_ADMIN_USER`/`SOC_ADMIN_PASSWORD`, emisión de JWT (sub, exp, iat) firmado con `SOC_JWT_SECRET`, y decode/validación
+- [x] 2.2 Crear dependencia FastAPI `require_auth` que lea el token (cookie `session` o header `Authorization: Bearer`) y falle con HTTP 401 si es inválido/expirado/ausente
+- [x] 2.3 Router `api/app/routers/auth.py`: `POST /api/v1/auth/login` (valida credenciales → setea cookie HttpOnly SameSite=Lax con el token → 200) y `POST /api/v1/auth/logout` (limpia cookie → 200)
+- [x] 2.4 Test: login con credenciales correctas → 200 + token; incorrectas → 401 sin detalle de cuál campo falló; acceso a endpoint protegido sin token → 401; logout → 200
+- [x] 2.5 Verificar que ningún log de la API imprime credenciales ni tokens (revisión de logging en login)
 
 ## 3. API — Repositorios de acceso a datos (design D5, spec api-soc)
 
-- [ ] 3.1 Crear `api/app/repositories/events.py`: `list_events(filters, page, page_size)` con SQL parametrizado (filtros: `from`/`to` sobre `timestamp`, `source_honeypot`, `protocol`, `src_ip`, `severity`→buckets de `risk_score`, `technique`, `username`, `search` sobre `commands`/`raw_data`), `ORDER BY timestamp DESC`, `LIMIT/OFFSET`, y `count_events` para el total
-- [ ] 3.2 Crear `api/app/repositories/events.py`: `get_event_by_id(id)` con las 16 columnas tipadas + `raw_data`/`enrichment_data` JSONB + respuestas de `responses` por `event_id`
-- [ ] 3.3 Crear `api/app/repositories/overview.py`: agregados por rango — total eventos, eventos por `source_honeypot`, top `src_ip` (vista `top_attackers` o query equivalente), alertas críticas recientes (buckets severidad), total `malware_hash` no nulo, MTTD = AVG(`created_at`−`timestamp`), MTTR = AVG delta a respuesta en `responses` (o NULL)
-- [ ] 3.4 Crear `api/app/repositories/mitre.py`: agrupar por `att_ck_technique` con conteo en el rango, y catálogo MITRE embebido (técnica → táctica/nombre) en `api/app/data/mitre_catalog.json`
-- [ ] 3.5 Crear `api/app/repositories/geo.py`: agrupar por país extrayendo de `enrichment_data` (JSONB), fallback a tabla de rangos de IP si no hay geo, ordenado por cantidad descendente
-- [ ] 3.6 Crear `api/app/repositories/malware.py` (agrupar `malware_hash` con `malware_filename`, `src_ip`, `timestamp`) y `api/app/repositories/iocs.py` (listar/filtrar tabla `iocs` por `ioc_type`, `severity`, búsqueda `ioc_value`)
-- [ ] 3.7 Crear `api/app/repositories/responses.py`: listar `responses` con filtros `action_type`, `status`, `event_id`, rango de fechas
-- [ ] 3.8 Tests unitarios de repositorios con PostgreSQL de prueba: filtros combinados, paginación fuera de rango, severidad por bucket, orden por timestamp, búsqueda de texto, consultas con datos y con cero filas (sin errores)
+- [x] 3.1 Crear `api/app/repositories/events.py`: `list_events(filters, page, page_size)` con SQL parametrizado (filtros: `from`/`to` sobre `timestamp`, `source_honeypot`, `protocol`, `src_ip`, `severity`→buckets de `risk_score`, `technique`, `username`, `search` sobre `commands`/`raw_data`), `ORDER BY timestamp DESC`, `LIMIT/OFFSET`, y `count_events` para el total
+- [x] 3.2 Crear `api/app/repositories/events.py`: `get_event_by_id(id)` con las 16 columnas tipadas + `raw_data`/`enrichment_data` JSONB + respuestas de `responses` por `event_id`
+- [x] 3.3 Crear `api/app/repositories/overview.py`: agregados por rango — total eventos, eventos por `source_honeypot`, top `src_ip` (vista `top_attackers` o query equivalente), alertas críticas recientes (buckets severidad), total `malware_hash` no nulo, MTTD = AVG(`created_at`−`timestamp`), MTTR = AVG delta a respuesta en `responses` (o NULL)
+- [x] 3.4 Crear `api/app/repositories/mitre.py`: agrupar por `att_ck_technique` con conteo en el rango, y catálogo MITRE embebido (técnica → táctica/nombre) en `api/app/data/mitre_catalog.json`
+- [x] 3.5 Crear `api/app/repositories/geo.py`: agrupar por país extrayendo de `enrichment_data` (JSONB), fallback a tabla de rangos de IP si no hay geo, ordenado por cantidad descendente
+- [x] 3.6 Crear `api/app/repositories/malware.py` (agrupar `malware_hash` con `malware_filename`, `src_ip`, `timestamp`) y `api/app/repositories/iocs.py` (listar/filtrar tabla `iocs` por `ioc_type`, `severity`, búsqueda `ioc_value`)
+- [x] 3.7 Crear `api/app/repositories/responses.py`: listar `responses` con filtros `action_type`, `status`, `event_id`, rango de fechas
+- [x] 3.8 Tests unitarios de repositorios con PostgreSQL de prueba: filtros combinados, paginación fuera de rango, severidad por bucket, orden por timestamp, búsqueda de texto, consultas con datos y con cero filas (sin errores)
 
 ## 4. API — Routers de datos (spec api-soc)
 
-- [ ] 4.1 Router `api/app/routers/overview.py`: `GET /api/v1/overview` protegido con `from`/`to` opcionales — devuelve métricas del overview (ceros/vacío si no hay datos, 200 siempre)
-- [ ] 4.2 Router `api/app/routers/events.py`: `GET /api/v1/events` protegido con paginación + filtros (validación Pydantic de query params, page/page_size con defaults y límites) y `GET /api/v1/events/{id}` (404 si no existe)
-- [ ] 4.3 Router `api/app/routers/mitre.py`: `GET /api/v1/mitre` protegido con rango — técnicas con conteo + metadata del catálogo; lista vacía sin errores si no hay técnicas
-- [ ] 4.4 Router `api/app/routers/geo.py`: `GET /api/v1/geo/countries` protegido con rango — países ordenados por cantidad; lista vacía sin data geo
-- [ ] 4.5 Router `api/app/routers/malware.py`: `GET /api/v1/malware` protegido con rango — hashes únicos con frecuencia/detalle; `GET /api/v1/iocs` con filtros por tipo/severidad/búsqueda
-- [ ] 4.6 Router `api/app/routers/health.py`: `GET /api/v1/health` público (API + query de prueba a postgres → `ok`/`degraded`) y `GET /api/v1/health/services` protegido (+ healthz de n8n vía httpx)
-- [ ] 4.7 Tests de integración con `TestClient`/httpx: cada endpoint responde 200 con datos de prueba, 401 sin token, y los shapes de respuesta coinciden con los DTOs Pydantic
-- [ ] 4.8 Verificar `GET /api/v1/openapi.json` lista todos los endpoints y que `docs` (Swagger UI) carga en el navegador
+- [x] 4.1 Router `api/app/routers/overview.py`: `GET /api/v1/overview` protegido con `from`/`to` opcionales — devuelve métricas del overview (ceros/vacío si no hay datos, 200 siempre)
+- [x] 4.2 Router `api/app/routers/events.py`: `GET /api/v1/events` protegido con paginación + filtros (validación Pydantic de query params, page/page_size con defaults y límites) y `GET /api/v1/events/{id}` (404 si no existe)
+- [x] 4.3 Router `api/app/routers/mitre.py`: `GET /api/v1/mitre` protegido con rango — técnicas con conteo + metadata del catálogo; lista vacía sin errores si no hay técnicas
+- [x] 4.4 Router `api/app/routers/geo.py`: `GET /api/v1/geo/countries` protegido con rango — países ordenados por cantidad; lista vacía sin data geo
+- [x] 4.5 Router `api/app/routers/malware.py`: `GET /api/v1/malware` protegido con rango — hashes únicos con frecuencia/detalle; `GET /api/v1/iocs` con filtros por tipo/severidad/búsqueda
+- [x] 4.6 Router `api/app/routers/health.py`: `GET /api/v1/health` público (API + query de prueba a postgres → `ok`/`degraded`) y `GET /api/v1/health/services` protegido (+ healthz de n8n vía httpx)
+- [x] 4.7 Tests de integración con `TestClient`/httpx: cada endpoint responde 200 con datos de prueba, 401 sin token, y los shapes de respuesta coinciden con los DTOs Pydantic
+- [x] 4.8 Verificar `GET /api/v1/openapi.json` lista todos los endpoints y que `docs` (Swagger UI) carga en el navegador
 
 ## 5. API — Feed de eventos en vivo por SSE (design D4, spec api-soc)
 
-- [ ] 5.1 Crear `api/app/services/live.py`: generador async que poll a `honeypot_events WHERE id > last_id ORDER BY id LIMIT N` cada 2s (constante configurable) y emite `event: event` + `ping` de heartbeat cada 15s
-- [ ] 5.2 Router `api/app/routers/live.py`: `GET /api/v1/events/live` protegido (401 sin token) que devuelve `StreamingResponse` con `text/event-stream`, headers `Cache-Control: no-cache` y `X-Accel-Buffering: no`
-- [ ] 5.3 Manejar desconexión del cliente (cancelación del generador sin errores) y no dejar streams huérfanos
-- [ ] 5.4 Tests: suscriptor recibe evento nuevo dentro de <= 5s tras insertar una fila de prueba en `honeypot_events`; heartbeat emitido sin eventos; 401 sin token; desconexión limpia sin excepciones
+- [x] 5.1 Crear `api/app/services/live.py`: generador async que poll a `honeypot_events WHERE id > last_id ORDER BY id LIMIT N` cada 2s (constante configurable) y emite `event: event` + `ping` de heartbeat cada 15s
+- [x] 5.2 Router `api/app/routers/live.py`: `GET /api/v1/events/live` protegido (401 sin token) que devuelve `StreamingResponse` con `text/event-stream`, headers `Cache-Control: no-cache` y `X-Accel-Buffering: no`
+- [x] 5.3 Manejar desconexión del cliente (cancelación del generador sin errores) y no dejar streams huérfanos
+- [x] 5.4 Tests: suscriptor recibe evento nuevo dentro de <= 5s tras insertar una fila de prueba en `honeypot_events`; heartbeat emitido sin eventos; 401 sin token; desconexión limpia sin excepciones
 
 ## 6. API — Integración con n8n (design D6, specs api-soc + automatizacion-web)
 
-- [ ] 6.1 Crear `api/app/services/n8n_client.py` (httpx, Basic Auth con `N8N_BASIC_AUTH_*`): `list_workflows()` → `GET {N8N_INTERNAL_URL}/api/v1/workflows`, `list_executions()` → `GET {N8N_INTERNAL_URL}/api/v1/executions?limit=50`
-- [ ] 6.2 En `n8n_client.py`: `simulate(honeypot, payload)` → POST a `{N8N_INTERNAL_URL}/webhook/cowrie` o `/webhook/dionaea`; `block_ip(src_ip, event_id, reason, duration=None)` → POST a `{N8N_INTERNAL_URL}/webhook/firewall-block` con payload `{event_id, ip: src_ip, duration, reason}` (duration opcional/null); `create_ticket(event_id, name, content, urgency)` → POST a `{N8N_INTERNAL_URL}/webhook/glpi-ticket` con payload `{event_id, name, content, urgency}`; todos con timeout y captura de errores de conexión
-- [ ] 6.3 Router `api/app/routers/automation.py` (protegido): `GET /api/v1/automation/workflows` y `GET /api/v1/automation/executions` con degradación `degraded: true` + 502/503 si n8n no responde
-- [ ] 6.4 Router `automation.py`: `POST /api/v1/automation/simulate` — valida `honeypot` (422 si no es cowrie/dionaea), delega a n8n, devuelve resultado del webhook; 502/503 si n8n falla sin reportar éxito
-- [ ] 6.5 Router `automation.py`: `POST /api/v1/automation/block-ip` — valida `src_ip` (422 si inválida), mapea `{src_ip, event_id, reason}` → `{event_id, ip: src_ip, duration, reason}` (duration opcional), delega a `{N8N_INTERNAL_URL}/webhook/firewall-block`, devuelve resultado; 502/503 si n8n falla
-- [ ] 6.6 Router `automation.py`: `POST /api/v1/automation/create-ticket` — valida `name`/`content` (422 si vacíos), delega a `{N8N_INTERNAL_URL}/webhook/glpi-ticket`, devuelve resultado; 502/503 si n8n falla
-- [ ] 6.7 Router `automation.py`: `GET /api/v1/automation/responses` con filtros — lee de `responses` (repositorio 3.7)
-- [ ] 6.8 Tests de integración: mock de n8n (httpx MockTransport) para workflows/executions/simulate/block-ip/create-ticket OK y con n8n caído → degradación correcta; 422 con honeypot inválido, IP inválida y ticket sin `name`/`content`
+- [x] 6.1 Crear `api/app/services/n8n_client.py` (httpx, Basic Auth con `N8N_BASIC_AUTH_*`): `list_workflows()` → `GET {N8N_INTERNAL_URL}/api/v1/workflows`, `list_executions()` → `GET {N8N_INTERNAL_URL}/api/v1/executions?limit=50`
+- [x] 6.2 En `n8n_client.py`: `simulate(honeypot, payload)` → POST a `{N8N_INTERNAL_URL}/webhook/cowrie` o `/webhook/dionaea`; `block_ip(src_ip, event_id, reason, duration=None)` → POST a `{N8N_INTERNAL_URL}/webhook/firewall-block` con payload `{event_id, ip: src_ip, duration, reason}` (duration opcional/null); `create_ticket(event_id, name, content, urgency)` → POST a `{N8N_INTERNAL_URL}/webhook/glpi-ticket` con payload `{event_id, name, content, urgency}`; todos con timeout y captura de errores de conexión
+- [x] 6.3 Router `api/app/routers/automation.py` (protegido): `GET /api/v1/automation/workflows` (n8n caído → 502/503 sin datos falsos) y `GET /api/v1/automation/executions` (n8n caído → 200 con lista vacía + `degraded: true`), según spec automatizacion-web
+- [x] 6.4 Router `automation.py`: `POST /api/v1/automation/simulate` — valida `honeypot` (422 si no es cowrie/dionaea), delega a n8n, devuelve resultado del webhook; 502/503 si n8n falla sin reportar éxito
+- [x] 6.5 Router `automation.py`: `POST /api/v1/automation/block-ip` — valida `src_ip` (422 si inválida), mapea `{src_ip, event_id, reason}` → `{event_id, ip: src_ip, duration, reason}` (duration opcional), delega a `{N8N_INTERNAL_URL}/webhook/firewall-block`, devuelve resultado; 502/503 si n8n falla
+- [x] 6.6 Router `automation.py`: `POST /api/v1/automation/create-ticket` — valida `name`/`content` (422 si vacíos), delega a `{N8N_INTERNAL_URL}/webhook/glpi-ticket`, devuelve resultado; 502/503 si n8n falla
+- [x] 6.7 Router `automation.py`: `GET /api/v1/automation/responses` con filtros — lee de `responses` (repositorio 3.7)
+- [x] 6.8 Tests de integración: mock de n8n (httpx MockTransport) para workflows/executions/simulate/block-ip/create-ticket OK y con n8n caído → degradación correcta; 422 con honeypot inválido, IP inválida y ticket sin `name`/`content`
 
 ## 7. Verificación/activación de los workflows n8n existentes (design D6, spec automatizacion-web)
 
-- [ ] 7.1 Verificar/importar en el n8n corriendo los workflows EXISTENTES `workflows/webhook-firewall-block.json` y `workflows/webhook-glpi-ticket.json` (UI o `n8n import:workflow --input=...`), activándolos si no lo están, siguiendo las convenciones del repo
-- [ ] 7.2 Validar que las rutas `/webhook/firewall-block` y `/webhook/glpi-ticket` no colisionan con los workflows activos existentes (`/webhook/cowrie`, `/webhook/dionaea`)
-- [ ] 7.3 Verificación manual block-ip: `curl -X POST -H "Content-Type: application/json" -d '{"event_id":null,"ip":"8.8.8.8","duration":3600,"reason":"test"}' http://localhost:5678/webhook/firewall-block` → 200 y una fila en `responses` con `action_type='bloqueo'` y `actor='n8n-automated'`
-- [ ] 7.4 Verificación manual ticket: `curl -X POST -H "Content-Type: application/json" -d '{"event_id":null,"name":"Alerta SOC","content":"prueba","urgency":"high"}' http://localhost:5678/webhook/glpi-ticket` → 200 y una fila en `responses` con `action_type='alerta'` y `actor='n8n-automated'`
-- [ ] 7.5 Verificar que los workflows existentes siguen activos y respondiendo tras la importación (POST de prueba a `/webhook/cowrie` y `/webhook/dionaea`)
+- [x] 7.1 Verificar/importar en el n8n corriendo los workflows EXISTENTES `workflows/webhook-firewall-block.json` y `workflows/webhook-glpi-ticket.json` (UI o `n8n import:workflow --input=...`), activándolos si no lo están, siguiendo las convenciones del repo
+- [x] 7.2 Validar que las rutas `/webhook/firewall-block` y `/webhook/glpi-ticket` no colisionan con los workflows activos existentes (`/webhook/cowrie`, `/webhook/dionaea`)
+- [x] 7.3 Verificación manual block-ip: `curl -X POST -H "Content-Type: application/json" -d '{"event_id":null,"ip":"8.8.8.8","duration":3600,"reason":"test"}' http://localhost:5678/webhook/firewall-block` → 200 y una fila en `responses` con `action_type='bloqueo'` y `actor='n8n-automated'`
+- [x] 7.4 Verificación manual ticket: `curl -X POST -H "Content-Type: application/json" -d '{"event_id":null,"name":"Alerta SOC","content":"prueba","urgency":"high"}' http://localhost:5678/webhook/glpi-ticket` → 200 y una fila en `responses` con `action_type='alerta'` y `actor='n8n-automated'`
+- [x] 7.5 Verificar que los workflows existentes siguen activos y respondiendo tras la importación (POST de prueba a `/webhook/cowrie` y `/webhook/dionaea`)
 
 ## 8. Scaffolding del frontend (`web/`) + design system (design D2/D9, spec web-soc-ui)
 

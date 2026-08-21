@@ -1,4 +1,5 @@
 {
+  "id": "soc-firewall-block-01",
   "name": "SOC - Firewall Block Endpoint",
   "nodes": [
     {
@@ -21,14 +22,20 @@
         "operation": "executeQuery",
         "query": "INSERT INTO responses (event_id, action_type, actor, status, details)\nVALUES ($1, 'bloqueo', 'n8n-automated', 'completed',\n  jsonb_build_object(\n    'ip', $2,\n    'duration', $3,\n    'reason', $4,\n    'executed_at', now()::text\n  )\n)\nRETURNING id, timestamp",
         "options": {
-          "queryReplacement": "={{ $json[\"event_id\"] || null }},={{ $json[\"ip\"] }},={{ $json[\"duration\"] }},={{ $json[\"reason\"] }}"
+          "queryReplacement": "={{ $json.body[\"event_id\"] || null }},={{ $json.body[\"ip\"] }},={{ $json.body[\"duration\"] }},={{ $json.body[\"reason\"] }}"
         }
       },
       "id": "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c",
       "name": "Registrar Bloqueo",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2,
-      "position": [450, 300]
+      "position": [450, 300],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-cred-001",
+          "name": "PostgreSQL_Audit"
+        }
+      }
     },
     {
       "parameters": {

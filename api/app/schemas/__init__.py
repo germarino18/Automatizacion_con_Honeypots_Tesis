@@ -1,0 +1,1 @@
+"""Pydantic DTOs for the Honeypot SOC API."""

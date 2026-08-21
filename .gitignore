@@ -44,5 +44,7 @@ Thumbs.db
 # ---------- Python ----------
 __pycache__/
 .pytest_cache/
+.venv/
+**/.venv/
 !dionaea/python/
 !dionaea/python/*.py

@@ -1,0 +1,12 @@
+{
+  "T1059": {"tactic": "Execution", "name": "Command and Scripting Interpreter"},
+  "T1190": {"tactic": "Initial Access", "name": "Exploit Public-Facing Application"},
+  "T1078": {"tactic": "Defense Evasion", "name": "Valid Accounts"},
+  "T1110": {"tactic": "Credential Access", "name": "Brute Force"},
+  "T1021": {"tactic": "Lateral Movement", "name": "Remote Services"},
+  "T1210": {"tactic": "Lateral Movement", "name": "Exploitation of Remote Services"},
+  "T1189": {"tactic": "Initial Access", "name": "Drive-by Compromise"},
+  "T1566": {"tactic": "Initial Access", "name": "Phishing"},
+  "T1005": {"tactic": "Collection", "name": "Data from Local System"},
+  "T1082": {"tactic": "Discovery", "name": "System Information Discovery"}
+}
