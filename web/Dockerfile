@@ -1,4 +1,5 @@
-FROM node:20-alpine AS build
+# pnpm 11 requiere Node >= 22.5 (usa node:sqlite); la etapa de build no puede ser node:20
+FROM node:22-alpine AS build
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./

@@ -159,6 +159,8 @@ services:
       - red_interna
     depends_on:
       - n8n
+      - api
+      - web
     restart: unless-stopped
 
   # -------------------------------------------
@@ -183,6 +185,46 @@ services:
     depends_on:
       n8n:
         condition: service_started
+    restart: unless-stopped
+
+  # -------------------------------------------
+  # 8. API BACKEND (FastAPI - consola web SOC)
+  # -------------------------------------------
+  api:
+    build:
+      context: ./api
+    container_name: soc-api
+    environment:
+      # Base de datos (PostgreSQL)
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      # Credenciales del admin de la consola y secreto JWT (desde .env)
+      SOC_ADMIN_USER: ${SOC_ADMIN_USER}
+      SOC_ADMIN_PASSWORD: ${SOC_ADMIN_PASSWORD}
+      SOC_JWT_SECRET: ${SOC_JWT_SECRET}
+      # API pública de n8n y URL interna (red_interna)
+      N8N_API_KEY: ${N8N_API_KEY}
+      N8N_INTERNAL_URL: http://n8n:5678
+    networks:
+      - red_interna
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # -------------------------------------------
+  # 9. WEB (SPA de la consola SOC - React + Vite)
+  # -------------------------------------------
+  web:
+    build:
+      context: ./web
+    container_name: soc-web
+    networks:
+      - red_interna
+    depends_on:
+      api:
+        condition: service_healthy
     restart: unless-stopped
 
 # ===========================================

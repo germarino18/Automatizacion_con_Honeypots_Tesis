@@ -95,12 +95,12 @@
 
 ## 11. Despliegue en docker-compose y nginx (design D7, spec despliegue-web)
 
-- [ ] 11.1 Agregar servicio `api` a `docker-compose.yml`: build `./api`, container `soc-api`, red `red_interna`, `depends_on` postgres healthy, `environment` con `POSTGRES_*`, `SOC_ADMIN_*`, `SOC_JWT_SECRET`, `N8N_API_KEY`, `N8N_INTERNAL_URL=http://n8n:5678` — sin puerto publicado al host
-- [ ] 11.2 Agregar servicio `web` a `docker-compose.yml`: build `./web`, container `soc-web`, red `red_interna`, `depends_on` api — sin puerto publicado al host
-- [ ] 11.3 Actualizar `nginx/nginx.conf`: upstreams `api_backend` (api:8000) y `web_backend` (web:80); `location /` → web (fallback SPA), `location /api/` → api con `proxy_buffering off` y headers X-Forwarded, mantener `location /webhook/` (n8n) y `location /grafana/` (grafana)
-- [ ] 11.4 Agregar a `.env` y `.env.example`: `SOC_ADMIN_USER`, `SOC_ADMIN_PASSWORD`, `SOC_JWT_SECRET` (placeholder vacío en `.env.example` con comentario de uso); documentar que `N8N_API_KEY` y `POSTGRES_*` ya existían
-- [ ] 11.5 Verificar `docker compose config` sin warnings de variables vacías y que `nginx` monta el mismo `nginx.conf` actualizado
-- [ ] 11.6 Grep de secretos: `git grep -iE "(SOC_ADMIN_PASSWORD|SOC_JWT_SECRET)=.+[A-Za-z0-9]{8,}"` NO debe arrojar valores reales (solo referencias en compose/env)
+- [x] 11.1 Agregar servicio `api` a `docker-compose.yml`: build `./api`, container `soc-api`, red `red_interna`, `depends_on` postgres healthy, `environment` con `POSTGRES_*`, `SOC_ADMIN_*`, `SOC_JWT_SECRET`, `N8N_API_KEY`, `N8N_INTERNAL_URL=http://n8n:5678` — sin puerto publicado al host
+- [x] 11.2 Agregar servicio `web` a `docker-compose.yml`: build `./web`, container `soc-web`, red `red_interna`, `depends_on` api — sin puerto publicado al host
+- [x] 11.3 Actualizar `nginx/nginx.conf`: upstreams `api_backend` (api:8000) y `web_backend` (web:80); `location /` → web (fallback SPA), `location /api/` → api con `proxy_buffering off` y headers X-Forwarded, mantener `location /webhook/` (n8n) y `location /grafana/` (grafana)
+- [x] 11.4 Agregar a `.env` y `.env.example`: `SOC_ADMIN_USER`, `SOC_ADMIN_PASSWORD`, `SOC_JWT_SECRET` (placeholder vacío en `.env.example` con comentario de uso); documentar que `N8N_API_KEY` y `POSTGRES_*` ya existían
+- [x] 11.5 Verificar `docker compose config` sin warnings de variables vacías y que `nginx` monta el mismo `nginx.conf` actualizado
+- [x] 11.6 Grep de secretos: `git grep -iE "(SOC_ADMIN_PASSWORD|SOC_JWT_SECRET)=.+[A-Za-z0-9]{8,}"` NO debe arrojar valores reales (solo referencias en compose/env)
 
 ## 12. Verificación integral y cierre
 
