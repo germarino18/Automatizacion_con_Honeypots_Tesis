@@ -328,3 +328,22 @@ export interface ResponsePage {
   page: number;
   page_size: number;
 }
+
+/* Acciones SOAR (espejo de api/app/schemas/automation.py) */
+
+export interface SimulateResponse {
+  success: boolean;
+  honeypot: string;
+  result: Record<string, unknown>;
+}
+
+export interface BlockIpResponse {
+  success: boolean;
+  src_ip: string;
+  result: Record<string, unknown>;
+}
+
+export interface CreateTicketResponse {
+  success: boolean;
+  result: Record<string, unknown>;
+}

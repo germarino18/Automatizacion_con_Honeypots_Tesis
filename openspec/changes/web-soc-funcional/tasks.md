@@ -83,14 +83,14 @@
 
 ## 10. Frontend — Pantallas (spec web-soc-ui)
 
-- [ ] 10.1 **Resumen del SOC** (`/`): consume `/overview` — tarjetas de métricas (total ataques, alertas críticas, IPs únicas, MTTD/MTTR), top IPs con risk score, comparativa Cowrie/Dionaea, alertas críticas recientes; estados vacíos y de error con retry
-- [ ] 10.2 **Ataques en Vivo** (`/live`): suscripción SSE a `/events/live` (EventSource con fetch fallback a polling de `/events`), tabla de feed con timestamp/IP/honeypot/protocolo/técnica/severidad, indicador eventos/seg, panel de amenaza activa; degradación a polling indicada en UI
-- [ ] 10.3 **Explorador de Eventos** (`/eventos`): filtros (rango de fechas, severidad, honeypot, protocolo, IP, técnica, búsqueda de texto), tabla paginada, orden por timestamp, exportación CSV client-side (separador `;`, UTF-8 BOM), apertura de detalle de evento (`/events/{id}` con raw_data y respuestas)
-- [ ] 10.4 **Matriz MITRE ATT&CK** (`/mitre`): consume `/mitre` — técnicas con conteo agrupadas por táctica; selección de técnica navega al explorador con filtro aplicado; estado vacío
-- [ ] 10.5 **Mapa Geográfico** (`/mapa`): consume `/geo/countries` — mapa vectorial offline con topojson embebido coloreado por cantidad + tabla de países; estado vacío informativo
-- [ ] 10.6 **Malware & IoC** (`/malware`): consume `/malware` y `/iocs` — hashes únicos con detalle, tabla de IoCs con filtro por tipo/severidad y búsqueda por valor
-- [ ] 10.7 **Automatización y Respuesta** (`/automatizacion`): consume `/automation/workflows`, `/automation/executions`, `/automation/responses` — estado de pipelines n8n, historial de ejecuciones y respuestas; acciones: simular ataque (modal con honeypot + payload), bloquear IP (modal con IP + razón + duration opcional) y crear ticket GLPI (modal con nombre, contenido y urgencia); estado degradado deshabilita acciones
-- [ ] 10.8 Aplicar design system en todas las pantallas: badges de severidad con colores semánticos, telemetría (IPs/hashes/IDs MITRE) en JetBrains Mono, layout denso con sidebar fijo
+- [x] 10.1 **Resumen del SOC** (`/`): consume `/overview` — tarjetas de métricas (total ataques, alertas críticas, IPs únicas, MTTD/MTTR), top IPs con risk score, comparativa Cowrie/Dionaea, alertas críticas recientes; estados vacíos y de error con retry
+- [x] 10.2 **Ataques en Vivo** (`/live`): suscripción SSE a `/events/live` (EventSource con fetch fallback a polling de `/events`), tabla de feed con timestamp/IP/honeypot/protocolo/técnica/severidad, indicador eventos/seg, panel de amenaza activa; degradación a polling indicada en UI
+- [x] 10.3 **Explorador de Eventos** (`/eventos`): filtros (rango de fechas, severidad, honeypot, protocolo, IP, técnica, búsqueda de texto), tabla paginada, orden por timestamp, exportación CSV client-side (separador `;`, UTF-8 BOM), apertura de detalle de evento (`/events/{id}` con raw_data y respuestas)
+- [x] 10.4 **Matriz MITRE ATT&CK** (`/mitre`): consume `/mitre` — técnicas con conteo agrupadas por táctica; selección de técnica navega al explorador con filtro aplicado; estado vacío
+- [x] 10.5 **Mapa Geográfico** (`/mapa`): consume `/geo/countries` — mapa vectorial offline con topojson embebido coloreado por cantidad + tabla de países; estado vacío informativo
+- [x] 10.6 **Malware & IoC** (`/malware`): consume `/malware` y `/iocs` — hashes únicos con detalle, tabla de IoCs con filtro por tipo/severidad y búsqueda por valor
+- [x] 10.7 **Automatización y Respuesta** (`/automatizacion`): consume `/automation/workflows`, `/automation/executions`, `/automation/responses` — estado de pipelines n8n, historial de ejecuciones y respuestas; acciones: simular ataque (modal con honeypot + payload), bloquear IP (modal con IP + razón + duration opcional) y crear ticket GLPI (modal con nombre, contenido y urgencia); estado degradado deshabilita acciones
+- [x] 10.8 Aplicar design system en todas las pantallas: badges de severidad con colores semánticos, telemetría (IPs/hashes/IDs MITRE) en JetBrains Mono, layout denso con sidebar fijo
 - [ ] 10.9 Verificación manual end-to-end del frontend: navegar todas las pantallas con el stack arriba, verificar render con datos reales, estados vacíos y errores de API
 
 ## 11. Despliegue en docker-compose y nginx (design D7, spec despliegue-web)

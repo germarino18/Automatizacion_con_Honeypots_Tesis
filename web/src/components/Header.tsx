@@ -31,7 +31,7 @@ export default function Header() {
         )}
         <button
           type="button"
-          className="header-logout"
+          className="btn btn-ghost"
           disabled={!isAuthenticated}
           title={
             isAuthenticated
