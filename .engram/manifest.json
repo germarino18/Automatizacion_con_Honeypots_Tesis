@@ -168,6 +168,14 @@
       "sessions": 0,
       "memories": 6,
       "prompts": 2
+    },
+    {
+      "id": "cca8241e",
+      "created_by": "navar",
+      "created_at": "2026-08-23T06:43:22Z",
+      "sessions": 0,
+      "memories": 3,
+      "prompts": 6
     }
   ]
 }
