@@ -36,12 +36,12 @@ export default function Login() {
   }
 
   return (
-    <section className="screen">
-      <h1 className="screen-title">Iniciar sesión</h1>
-      <p className="screen-subtitle">
-        Acceso a la consola del SOC con tus credenciales de operador.
-      </p>
+    <section className="standalone-page">
       <div className="card login-card">
+        <h1 className="login-title">Iniciar sesión</h1>
+        <p className="login-subtitle">
+          Acceso a la consola del SOC con tus credenciales de operador.
+        </p>
         <form className="login-form" onSubmit={handleSubmit}>
           <label className="login-field">
             <span>Usuario</span>

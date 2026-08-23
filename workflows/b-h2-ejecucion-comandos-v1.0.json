@@ -1,5 +1,7 @@
 {
   "name": "PB-H2 - Ejecución de Comandos Maliciosos (T1059)",
+  "active": true,
+  "id": "nFnt9n3Gk8Gh27mg",
   "nodes": [
     {
       "parameters": {
@@ -10,26 +12,30 @@
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.1,
       "position": [
-        -688,
-        640
-      ]
+        250,
+        300
+      ],
+      "notes": "PB-H2 se ejecuta como SUB-WORKFLOW llamado por PB-H1 (nodo Execute Workflow). n8n 2.x exige un nodo executeWorkflowTrigger como punto de entrada del sub-workflow (el noOp no califica -> 'Missing node to start execution'). El evento normalizado completo llega como input del sub-workflow."
     },
     {
       "parameters": {
-        "jsCode": "const event = $input.all()[0].json || {};\nconst command = event.input || event.command || event.commands || '';\n\nconst urlRegex = /(https?:\\/\\/[^\\s]+)/g;\nconst urls = command.match(urlRegex) || [];\n\nconst domainRegex = /(?:https?:\\/\\/)?([\\w\\-]+\\.[\\w\\-\\.]+)/g;\nconst domains = command.match(domainRegex) || [];\n\nconst dangerousCommands = ['rm -rf', 'chmod 777', 'nc -e', 'wget', 'curl', 'python -c', 'bash -i'];\nconst isDangerous = dangerousCommands.some(dc => command.toLowerCase().includes(dc));\n\nconst ip = event.src_ip || event.source_ip || '';\nconst valid = /^(\\d{1,3}\\.){3}\\d{1,3}$/.test(ip) && ip.split('.').every(n => +n >= 0 && +n <= 255);\n\nreturn [{\n  json: {\n    timestamp: event.timestamp || new Date().toISOString(),\n    source_honeypot: 'cowrie',\n    src_ip: valid ? ip : '0.0.0.0',\n    dst_port: event.dst_port || event.port || null,\n    protocol: event.protocol || 'ssh',\n    username: event.username || null,\n    session_id: event.session || event.session_id,\n    commands: command,\n    extracted_urls: urls,\n    extracted_domains: domains,\n    is_dangerous_command: isDangerous,\n    playbook_id: 'PB-H2-v1.0',\n    att_ck_technique: 'T1059',\n    event_id: event.event_id || null,\n    enrichment_data: {},\n    raw_data: event\n  }\n}];"
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const event = $input.all()[0].json || {};\nconst command = event.input || event.command || event.commands || '';\n\nconst urlRegex = /(https?:\\/\\/[^\\s]+)/g;\nconst urls = command.match(urlRegex) || [];\n\nconst domainRegex = /(?:https?:\\/\\/)?([\\w\\-]+\\.[\\w\\-\\.]+)/g;\nconst domains = command.match(domainRegex) || [];\n\n// Grupo 13: la tabla de tiers vive en \"Calcular Risk Score\"; aquí solo\n// se preservan los IoCs y el event_id para que PB-H2 actualice (no duplique)\n// la fila ya insertada por PB-H1.\nconst dangerousCommands = ['rm -rf', 'chmod 777', 'nc -e', 'wget', 'curl', 'python -c', 'bash -i'];\nconst isDangerous = dangerousCommands.some(dc => command.toLowerCase().includes(dc));\n\nconst ip = event.src_ip || event.source_ip || '';\nconst valid = /^(\\d{1,3}\\.){3}\\d{1,3}$/.test(ip) && ip.split('.').every(n => +n >= 0 && +n <= 255);\n\nreturn [{\n  json: {\n    timestamp: event.timestamp || new Date().toISOString(),\n    source_honeypot: 'cowrie',\n    src_ip: valid ? ip : '0.0.0.0',\n    dst_port: event.dst_port || event.port || null,\n    protocol: event.protocol || 'ssh',\n    username: event.username || null,\n    session_id: event.session || event.session_id,\n    commands: command,\n    extracted_urls: urls,\n    extracted_domains: domains,\n    is_dangerous_command: isDangerous,\n    playbook_id: 'PB-H2-v1.0',\n    att_ck_technique: 'T1059',\n    event_id: event.event_id || null,\n    enrichment_data: {},\n    raw_data: event\n  }\n}];\n"
       },
-      "id": "557b8117-0011-4ae1-9bf5-60920c408358",
-      "name": "Extraer IOCs1",
+      "id": "code-extract-iocs",
+      "name": "Extraer IOCs",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -480,
-        640
+        450,
+        300
       ],
       "onError": "continueRegularOutput"
     },
     {
       "parameters": {
+        "method": "GET",
         "url": "https://www.virustotal.com/api/v3/files/{{ $json[\"file_hash\"] }}",
         "sendHeaders": true,
         "headerParameters": {
@@ -42,18 +48,25 @@
         },
         "options": {}
       },
-      "id": "49ef0d87-29b4-434e-9af2-6e075e7f2c0c",
-      "name": "VirusTotal Lookup1",
+      "id": "http-virustotal",
+      "name": "VirusTotal Lookup",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
       "position": [
-        -272,
-        640
+        650,
+        300
       ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "virustotal-cred-001",
+          "name": "VirusTotal_API"
+        }
+      },
       "onError": "continueRegularOutput"
     },
     {
       "parameters": {
+        "method": "GET",
         "url": "https://api.whoisfreaks.com/v1.0/whois",
         "sendQuery": true,
         "queryParameters": {
@@ -70,27 +83,34 @@
         },
         "options": {}
       },
-      "id": "86d85c51-c1ff-4fa3-ad3b-e29ec4eb27b0",
-      "name": "WHOIS Domain1",
+      "id": "http-whois",
+      "name": "WHOIS Domain",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
       "position": [
-        -80,
-        640
+        850,
+        300
       ],
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "whois-cred-001",
+          "name": "Whois_API"
+        }
+      },
       "onError": "continueRegularOutput"
     },
     {
       "parameters": {
-        "functionCode": "// Calcular score de riesgo para comandos\n// Referencias a nodos de enriquecimiento (VirusTotal/WHOIS) con fallback\n// base: evento limpio desde Extraer IOCs (robusto aunque el enriquecimiento falle)\nconst baseItems = $('Extraer IOCs').all() || [];\nconst base = (baseItems[0] && baseItems[0].json) ? baseItems[0].json : (($input.all()[0] && $input.all()[0].json) || {});\nconst vtItems = $('VirusTotal Lookup').all() || [];\nconst whoisItems = $('WHOIS Domain').all() || [];\n\nconst vtData = (vtItems[0] && vtItems[0].json && vtItems[0].json.data) || {};\nconst whoisData = (whoisItems[0] && whoisItems[0].json) || {};\n\nlet score = 0;\n\n// Score por detecciones en VirusTotal\nconst vtDetections = vtData.attributes?.last_analysis_stats?.malicious || 0;\nif (vtDetections > 5) score += 0.4;\nif (vtDetections > 10) score += 0.2;\n\n// Score por dominio reciente (< 30 días)\nconst domainAge = whoisData.created_date || '';\nif (domainAge) {\n  const created = new Date(domainAge);\n  const daysOld = (new Date() - created) / (1000 * 60 * 60 * 24);\n  if (daysOld < 30) score += 0.3;\n}\n\n// Score por comando peligroso\nif (base.is_dangerous_command) score += 0.3;\n\n// Score por múltiples URLs\nif ((base.extracted_urls || []).length > 2) score += 0.2;\n\nscore = Math.min(score, 1.0);\n\nreturn [{\n  json: {\n    ...base,\n    risk_score: score,\n    vt_detections: vtDetections,\n    domain_age_days: domainAge ? ((new Date() - new Date(domainAge)) / (1000 * 60 * 60 * 24)).toFixed(0) : 'N/A',\n    enrichment_timestamp: new Date().toISOString()\n  }\n}];"
+        "functionCode": "// Calcular score de riesgo para comandos\n// Referencias a nodos de enriquecimiento (VirusTotal/WHOIS) con fallback\n// base: evento limpio desde Extraer IOCs (robusto aunque el enriquecimiento falle)\nconst baseItems = $('Extraer IOCs').all() || [];\nconst base = (baseItems[0] && baseItems[0].json) ? baseItems[0].json : (($input.all()[0] && $input.all()[0].json) || {});\nconst vtItems = $('VirusTotal Lookup').all() || [];\nconst whoisItems = $('WHOIS Domain').all() || [];\n\nconst vtData = (vtItems[0] && vtItems[0].json && vtItems[0].json.data) || {};\nconst whoisData = (whoisItems[0] && whoisItems[0].json) || {};\n\nlet score = 0;\n\n// Score por detecciones en VirusTotal\nconst vtDetections = vtData.attributes?.last_analysis_stats?.malicious || 0;\nif (vtDetections > 5) score += 0.4;\nif (vtDetections > 10) score += 0.2;\n\n// Score por dominio reciente (< 30 días)\nconst domainAge = whoisData.created_date || '';\nif (domainAge) {\n  const created = new Date(domainAge);\n  const daysOld = (new Date() - created) / (1000 * 60 * 60 * 24);\n  if (daysOld < 30) score += 0.3;\n}\n\n// Score por comando peligroso\nif (base.is_dangerous_command) score += 0.3;\n\n// Score por múltiples URLs\nif ((base.extracted_urls || []).length > 2) score += 0.2;\n\nscore = Math.min(score, 1.0);\n\nreturn [{\n  json: {\n    ...base,\n    risk_score: score,\n    vt_detections: vtDetections,\n    domain_age_days: domainAge ? ((new Date() - new Date(domainAge)) / (1000 * 60 * 60 * 24)).toFixed(0) : 'N/A',\n    enrichment_timestamp: new Date().toISOString()\n  }\n}];",
+        "jsCode": "// Calcular score de riesgo para comandos (grupo 13: tabla de tiers)\n// Referencias a nodos de enriquecimiento (VirusTotal/WHOIS) con fallback\n// base: evento limpio desde Extraer IOCs (robusto aunque el enriquecimiento falle)\nconst baseItems = $('Extraer IOCs').all() || [];\nconst base = (baseItems[0] && baseItems[0].json) ? baseItems[0].json : (($input.all()[0] && $input.all()[0].json) || {});\nconst vtItems = $('VirusTotal Lookup').all() || [];\nconst whoisItems = $('WHOIS Domain').all() || [];\n\nconst vtData = (vtItems[0] && vtItems[0].json && vtItems[0].json.data) || {};\nconst whoisData = (whoisItems[0] && whoisItems[0].json) || {};\n\n// ---------------------------------------------------------------------------\n// Tabla de tiers de riesgo por contenido del comando (grupo 13)\n// CRITICAL (base 0.85): destrucción de datos (rm -rf, mkfs, dd), shell inversa\n//   (bash -i >& | /dev/tcp | nc -e), pipe-a-shell (wget/curl | sh),\n//   escalada/persistencia (passwd, useradd, ssh-keygen, crontab) y apagado.\n// HIGH (base 0.70): descargas (wget/curl/scp), instalación de paquetes,\n//   netcat, kill de procesos, lectura de archivos sensibles (/etc/*) y\n//   anti-forense (history -c, shred).\n// MEDIUM (base 0.40): enumeración y reconocimiento benigno (whoami, id, ls...).\n// Sin match → 0 (el enriquecimiento VT/WHOIS puede sumar aparte).\n// Cada hit adicional dentro del tier suma \"step\", con techo \"cap\".\n// Los buckets de severidad de la API quedan: <0.33 low, <0.66 medium,\n// <0.85 high, >=0.85 critical.\n// ---------------------------------------------------------------------------\nconst COMMAND_TIERS = [\n  {\n    base: 0.85, step: 0.05, cap: 1.0,\n    patterns: [\n      /rm\\s+-[a-z]*r[a-z]*f/, /rm\\s+-[a-z]*f[a-z]*r/, /--no-preserve-root/,\n      /\\bmkfs\\b/, /\\bdd\\s+if=/, />\\s*\\/dev\\/(sd[a-z]|nvme|hd[a-z])\\b/,\n      /:\\(\\)\\s*\\{.*\\}\\s*;/,\n      /bash\\s+-i\\s+>&/, /\\/dev\\/tcp\\//,\n      /\\bnc(at)?\\b[^|;&]*\\s-e\\b/,\n      /\\|\\s*(ba|z|da|k)?sh\\b/,\n      /chmod\\s+777\\s+\\//, /\\bchown\\b[^;&]*\\s+\\//,\n      /\\/etc\\/shadow/, /\\/etc\\/sudoers/,\n      /\\bpasswd\\b/, /\\buseradd\\b/, /\\badduser\\b/, /\\busermod\\b/,\n      /\\bssh-keygen\\b/, /authorized_keys/,\n      /\\bcrontab\\b/, /\\/etc\\/rc\\.local/, /systemctl\\s+enable/,\n      /\\bshutdown\\b/, /\\breboot\\b/, /\\bhalt\\b/, /\\binit\\s+[06]\\b/\n    ]\n  },\n  {\n    base: 0.70, step: 0.04, cap: 0.84,\n    patterns: [\n      /\\bwget\\b/, /\\bcurl\\b/, /\\bscp\\b/, /\\btftp\\b/,\n      /\\bapt(-get)?\\s+install\\b/, /\\byum\\s+install\\b/, /\\bdnf\\s+install\\b/,\n      /\\bpacman\\s+-[su]\\b/, /\\bpip3?\\s+install\\b/, /\\bapk\\s+add\\b/,\n      /\\bnc(at)?\\b/, /\\bnetcat\\b/,\n      /\\bkill(all)?\\b/, /\\bpkill\\b/,\n      /\\b(cat|less|more|head|tail|strings)\\s+\\/etc\\//, /\\/etc\\/passwd/,\n      /\\bhistory\\s+-c\\b/, /unset\\s+histfile/, /\\bshred\\b/, /\\bwipe\\b/,\n      /\\bgcc\\b/, /\\bmake\\b/\n    ]\n  },\n  {\n    base: 0.40, step: 0.03, cap: 0.60,\n    patterns: [\n      /\\bwhoami\\b/, /\\bid\\b/, /\\buname\\b/, /\\bhostname\\b/, /\\buptime\\b/,\n      /\\bps\\b/, /\\bls\\b/, /\\bpwd\\b/, /\\benv\\b/, /\\bprintenv\\b/,\n      /\\bcat\\b/, /\\bfind\\b/, /\\bgrep\\b/, /\\bdiff\\b/, /\\bfile\\b/,\n      /\\bnmap\\b/, /\\bping\\b/, /\\bnslookup\\b/, /\\bdig\\b/, /\\btraceroute\\b/,\n      /\\bnetstat\\b/, /\\bss\\b/, /\\barp\\b/, /\\broute\\b/, /\\bifconfig\\b/, /\\bip\\s+addr\\b/,\n      /\\becho\\b/, /\\bprintf\\b/, /\\bsleep\\b/, /\\bcd\\b/, /\\bmkdir\\b/, /\\btouch\\b/\n    ]\n  }\n];\n\nfunction commandRiskScore(rawCommand) {\n  const cmd = String(rawCommand || '').toLowerCase();\n  if (!cmd.trim()) return 0;\n  let best = 0;\n  for (const tier of COMMAND_TIERS) {\n    let hits = 0;\n    for (const re of tier.patterns) {\n      if (re.test(cmd)) hits += 1;\n    }\n    if (hits > 0) {\n      const tierScore = Math.min(tier.base + (hits - 1) * tier.step, tier.cap);\n      if (tierScore > best) best = tierScore;\n    }\n  }\n  return Number(best.toFixed(2));\n}\n\n// El puntaje del comando es la base (garantiza el piso del tier);\n// el enriquecimiento externo suma encima, con techo 1.0.\nlet score = commandRiskScore(base.commands);\n\n// Score por detecciones en VirusTotal\nconst vtDetections = vtData.attributes?.last_analysis_stats?.malicious || 0;\nif (vtDetections > 5) score += 0.4;\nif (vtDetections > 10) score += 0.2;\n\n// Score por dominio reciente (< 30 días)\nconst domainAge = whoisData.created_date || '';\nif (domainAge) {\n  const created = new Date(domainAge);\n  const daysOld = (new Date() - created) / (1000 * 60 * 60 * 24);\n  if (daysOld < 30) score += 0.3;\n}\n\n// Score por múltiples URLs\nif ((base.extracted_urls || []).length > 2) score += 0.2;\n\nscore = Math.min(score, 1.0);\n\nreturn [{\n  json: {\n    ...base,\n    risk_score: Number(score.toFixed(2)),\n    command_risk_tier: score >= 0.85 ? 'critical' : (score >= 0.66 ? 'high' : (score >= 0.33 ? 'medium' : 'low')),\n    vt_detections: vtDetections,\n    domain_age_days: domainAge ? ((new Date() - new Date(domainAge)) / (1000 * 60 * 60 * 24)).toFixed(0) : 'N/A',\n    enrichment_timestamp: new Date().toISOString()\n  }\n}];\n"
       },
-      "id": "203cc334-28a8-4a60-908f-1f3fef63b70b",
-      "name": "Calcular Risk Score1",
+      "id": "function-scoring-h2",
+      "name": "Calcular Risk Score",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
       "position": [
-        128,
-        640
+        1050,
+        300
       ],
       "onError": "continueRegularOutput"
     },
@@ -106,13 +126,13 @@
           ]
         }
       },
-      "id": "be08b551-e27b-4ad5-8e2a-2bb9712543b3",
-      "name": "¿Riesgo Crítico? (≥0.75)1",
+      "id": "switch-critical",
+      "name": "¿Riesgo Crítico? (≥0.75)",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
       "position": [
-        336,
-        640
+        1250,
+        300
       ]
     },
     {
@@ -134,20 +154,26 @@
         },
         "options": {}
       },
-      "id": "f929a2ca-2db0-467a-9856-c7140b3d3109",
-      "name": "Slack Incidente Crítico1",
+      "id": "slack-critical-h2",
+      "name": "Slack Incidente Crítico",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
       "position": [
-        528,
-        528
+        1450,
+        200
       ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "slack-cred-001",
+          "name": "Slack_API"
+        }
+      },
       "onError": "continueRegularOutput"
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "http://n8n:5678/webhook/firewall-block",
+        "url": "https://api.your-firewall.com/api/v1/block",
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
@@ -162,60 +188,56 @@
             {
               "name": "reason",
               "value": "Malicious command execution - PB-H2"
-            },
-            {
-              "name": "event_id",
-              "value": "={{ $json[\"event_id\"] }}"
             }
           ]
         },
         "options": {}
       },
-      "id": "6df357b5-8aee-4d23-8f73-60684ad664c1",
-      "name": "Bloqueo Firewall Inmediato1",
+      "id": "http-firewall-block-h2",
+      "name": "Bloqueo Firewall Inmediato",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
       "position": [
-        736,
-        528
+        1650,
+        200
       ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "firewall-cred-001",
+          "name": "Firewall_API"
+        }
+      },
       "onError": "continueRegularOutput"
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "http://n8n:5678/webhook/glpi-ticket",
+        "url": "https://your-glpi-instance.com/apirest.php/Ticket",
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
             {
-              "name": "name",
-              "value": "=CRÍTICO - Comando Malicioso - {{ $json[\"src_ip\"] }}"
-            },
-            {
-              "name": "content",
-              "value": "=IP: {{ $json[\"src_ip\"] }}\nComando: {{ $json[\"commands\"] }}\nScore: {{ $json[\"risk_score\"] }}\nVT Detections: {{ $json[\"vt_detections\"] }}"
-            },
-            {
-              "name": "urgency",
-              "value": "5"
-            },
-            {
-              "name": "event_id",
-              "value": "={{ $json[\"event_id\"] }}"
+              "name": "input",
+              "value": "={\"name\": \"CRÍTICO - Comando Malicioso - {{ $json[\"src_ip\"] }}\", \"content\": \"IP: {{ $json[\"src_ip\"] }}\\nComando: {{ $json[\"commands\"] }}\\nScore: {{ $json[\"risk_score\"] }}\\nVT Detections: {{ $json[\"vt_detections\"] }}\", \"urgency\": \"5\"}"
             }
           ]
         },
         "options": {}
       },
-      "id": "5a94b945-1c93-4cd0-832f-1691adf1d134",
-      "name": "Crear Ticket Prioritario1",
+      "id": "glpi-ticket-h2",
+      "name": "Crear Ticket Prioritario",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
       "position": [
-        928,
-        528
+        1850,
+        200
       ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "glpi-cred-001",
+          "name": "GLPI_API"
+        }
+      },
       "onError": "continueRegularOutput"
     },
     {
@@ -237,36 +259,42 @@
         },
         "options": {}
       },
-      "id": "5d87659a-12b7-40e6-9d83-d0a609b1a107",
-      "name": "Slack Notificación Informativa1",
+      "id": "slack-info-h2",
+      "name": "Slack Notificación Informativa",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
       "position": [
-        528,
-        736
+        1450,
+        400
       ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "slack-cred-001",
+          "name": "Slack_API"
+        }
+      },
       "onError": "continueRegularOutput"
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "UPDATE honeypot_events SET risk_score = $1, att_ck_technique = $2, enrichment_data = CAST($3 AS jsonb), playbook_id = $4 WHERE id = $5 RETURNING id, timestamp, src_ip, commands, risk_score",
+        "query": "UPDATE honeypot_events SET risk_score = $1, enrichment_data = CAST($2 AS jsonb), playbook_id = $3 WHERE id = $4 RETURNING id AS event_id, timestamp, src_ip, commands, risk_score",
         "options": {
-          "queryReplacement": "={{ $json[\"risk_score\"] || 0 }},={{ $json[\"att_ck_technique\"] }},={{ JSON.stringify($json[\"enrichment_data\"]) }},={{ $json[\"playbook_id\"] }},={{ $json[\"event_id\"] }}"
+          "queryReplacement": "={{ $json[\"risk_score\"] || 0 }},={{ JSON.stringify($json[\"enrichment_data\"] || {}) }},={{ $json[\"playbook_id\"] }},={{ $json[\"event_id\"] }}"
         }
       },
-      "id": "d163b3ec-ac0a-486f-9f18-647cae2d6f6b",
-      "name": "PostgreSQL Auditoría1",
+      "id": "postgres-audit-h2",
+      "name": "PostgreSQL Auditoría",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2,
       "position": [
-        1136,
-        640
+        2050,
+        300
       ],
       "credentials": {
         "postgres": {
-          "id": "o4zbA9M4GSv84S8w",
-          "name": "Postgres SOC"
+          "id": "postgres-cred-001",
+          "name": "PostgreSQL_Audit"
         }
       }
     },
@@ -278,129 +306,138 @@
           "queryReplacement": "={{ $json[\"event_id\"] }},={{ $json[\"risk_score\"] >= 0.75 ? \"block\" : \"log\" }},n8n-automated,completed,={{ \"/evidence/\" + $json[\"src_ip\"] + \"-\" + $json[\"timestamp\"] }}"
         }
       },
-      "id": "d8f13819-e507-4ac3-a4fd-4a6ace35d12f",
-      "name": "PostgreSQL Respuestas1",
+      "id": "postgres-response",
+      "name": "PostgreSQL Respuestas",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2,
       "position": [
-        1328,
-        640
+        2250,
+        300
       ],
       "credentials": {
         "postgres": {
-          "id": "o4zbA9M4GSv84S8w",
-          "name": "Postgres SOC"
+          "id": "postgres-cred-001",
+          "name": "PostgreSQL_Audit"
         }
       }
     }
   ],
-  "pinData": {},
   "connections": {
     "Inicio (Sub-workflow)": {
       "main": [
         [
           {
-            "node": "Extraer IOCs1",
+            "node": "Extraer IOCs",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Extraer IOCs1": {
+    "Extraer IOCs": {
       "main": [
         [
           {
-            "node": "VirusTotal Lookup1",
+            "node": "VirusTotal Lookup",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "VirusTotal Lookup1": {
+    "VirusTotal Lookup": {
       "main": [
         [
           {
-            "node": "WHOIS Domain1",
+            "node": "WHOIS Domain",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "WHOIS Domain1": {
+    "WHOIS Domain": {
       "main": [
         [
           {
-            "node": "Calcular Risk Score1",
+            "node": "Calcular Risk Score",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Calcular Risk Score1": {
+    "Calcular Risk Score": {
       "main": [
         [
           {
-            "node": "PostgreSQL Auditoría1",
+            "node": "¿Riesgo Crítico? (≥0.75)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "PostgreSQL Auditoría",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "¿Riesgo Crítico? (≥0.75)1": {
+    "¿Riesgo Crítico? (≥0.75)": {
       "main": [
         [
           {
-            "node": "Slack Incidente Crítico1",
+            "node": "Slack Incidente Crítico",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Slack Notificación Informativa1",
+            "node": "Slack Notificación Informativa",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Slack Incidente Crítico1": {
+    "Slack Incidente Crítico": {
       "main": [
         [
           {
-            "node": "Bloqueo Firewall Inmediato1",
+            "node": "Bloqueo Firewall Inmediato",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Bloqueo Firewall Inmediato1": {
+    "Bloqueo Firewall Inmediato": {
       "main": [
         [
           {
-            "node": "Crear Ticket Prioritario1",
+            "node": "Crear Ticket Prioritario",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "PostgreSQL Auditoría1": {
+    "Crear Ticket Prioritario": {
+      "main": [
+        []
+      ]
+    },
+    "Slack Notificación Informativa": {
+      "main": [
+        []
+      ]
+    },
+    "PostgreSQL Auditoría": {
       "main": [
         [
           {
-            "node": "¿Riesgo Crítico? (≥0.75)1",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "PostgreSQL Respuestas1",
+            "node": "PostgreSQL Respuestas",
             "type": "main",
             "index": 0
           }
@@ -408,36 +445,34 @@
       ]
     }
   },
-  "active": true,
   "settings": {
     "executionOrder": "v1",
-    "binaryMode": "separate"
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
   },
-  "versionId": "f1902ace-d8bd-4534-86ef-127063ffe9cc",
+  "versionId": "4a865617-0ddf-4067-bab1-e7c006cdba69",
   "meta": {
-    "templateCredsSetupCompleted": true,
-    "instanceId": "1e7ace918ce7ab37cef139ca5c7800e347ad6ce8e2eb45c059849d2fe3550291"
+    "instanceId": "honeypot-soc-n8n",
+    "templateCredsSetupCompleted": true
   },
-  "nodeGroups": [],
-  "id": "OMcfXeeuewrAPahm",
   "tags": [
     {
-      "name": "PB-H2",
-      "id": "8D2fJsUOLwPG0qrG",
-      "updatedAt": "2026-08-17T18:19:55.554Z",
-      "createdAt": "2026-08-17T18:19:55.554Z"
+      "updatedAt": "2026-08-10T20:09:15.770Z",
+      "createdAt": "2026-08-10T20:09:15.770Z",
+      "id": "sBe76a3RT69O47Wt",
+      "name": "PB-H2"
     },
     {
-      "name": "Ejecución",
-      "id": "93q7TevOa9lw45ez",
-      "updatedAt": "2026-08-17T18:19:55.504Z",
-      "createdAt": "2026-08-17T18:19:55.504Z"
+      "updatedAt": "2026-08-10T20:09:15.770Z",
+      "createdAt": "2026-08-10T20:09:15.770Z",
+      "id": "VxPrQH4GZloyzOak",
+      "name": "T1059"
     },
     {
-      "name": "T1059",
-      "id": "8d63EtHUR8ZEdQZQ",
-      "updatedAt": "2026-08-17T18:19:55.503Z",
-      "createdAt": "2026-08-17T18:19:55.503Z"
+      "updatedAt": "2026-08-10T20:09:15.770Z",
+      "createdAt": "2026-08-10T20:09:15.770Z",
+      "id": "57GzpL7v5xr7GpOq",
+      "name": "Ejecución"
     }
   ]
 }

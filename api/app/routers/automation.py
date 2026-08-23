@@ -86,6 +86,7 @@ async def list_workflows(_user=Depends(require_auth)):
             id=wf.get("id"),
             name=wf.get("name", ""),
             active=bool(wf.get("active", False)),
+            updated_at=wf.get("updatedAt"),
         )
         for wf in data.get("data", [])
     ]

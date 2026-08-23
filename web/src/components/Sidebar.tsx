@@ -78,6 +78,13 @@ const NAV_ITEMS: NavItem[] = [
       <Icon path="M12 2l3 3h4v4l3 3 -3 3v4h-4l-3 3 -3 -3H5v-4L2 12l3 -3V5h4z" />
     ),
   },
+  {
+    to: '/workflows',
+    label: 'Workflows n8n',
+    icon: (
+      <Icon path="M3 5h6v6H3zM15 13h6v6h-6zM9 8h4a2 2 0 0 1 2 2v5M12 8V5a2 2 0 0 1 2-2h1" />
+    ),
+  },
 ];
 
 function BrandMark() {

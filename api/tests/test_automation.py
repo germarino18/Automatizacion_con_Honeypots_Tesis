@@ -36,7 +36,12 @@ def _patch_n8n(monkeypatch, handler):
 def _workflows_data():
     return {
         "data": [
-            {"id": "wf-1", "name": "SOC - Firewall Block Endpoint", "active": True},
+            {
+                "id": "wf-1",
+                "name": "SOC - Firewall Block Endpoint",
+                "active": True,
+                "updatedAt": "2026-08-20T10:15:30.000Z",
+            },
             {"id": "wf-2", "name": "SOC - GLPI Ticket Endpoint", "active": False},
         ]
     }
@@ -60,7 +65,10 @@ async def test_workflows_ok(auth_client, monkeypatch):
     assert len(body.items) == 2
     assert body.items[0].name == "SOC - Firewall Block Endpoint"
     assert body.items[0].active is True
+    assert body.items[0].updated_at is not None
+    assert body.items[0].updated_at.year == 2026
     assert body.items[1].active is False
+    assert body.items[1].updated_at is None
 
 
 @pytest.mark.asyncio

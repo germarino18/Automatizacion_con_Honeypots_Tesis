@@ -14,7 +14,10 @@
       "name": "Webhook Cowrie",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
-      "position": [250, 300],
+      "position": [
+        250,
+        300
+      ],
       "webhookId": "cowrie-webhook-001"
     },
     {
@@ -22,13 +25,16 @@
         "mode": "runOnceForAllItems",
         "language": "javaScript",
         "jsCode": "// Normalizar datos del honeypot (Corrección A - PB-H1)\nconst event = $input.all()[0].json || {};\n// n8n v2 webhook envuelve el payload en .body — desempaquetar para leer los campos del evento\nconst payload = (event.body && typeof event.body === 'object') ? event.body : event;\n\n// Validación de src_ip como inet\nconst ip = payload.src_ip || payload.source_ip || '';\nconst valid = /^(\\d{1,3}\\.){3}\\d{1,3}$/.test(ip) && ip.split('.').every(n => +n >= 0 && +n <= 255);\n\nconst normalized = {\n  timestamp: payload.timestamp || new Date().toISOString(),\n  source_honeypot: 'cowrie',\n  src_ip: valid ? ip : '0.0.0.0',\n  dst_port: payload.dst_port || payload.port || null,\n  session_id: payload.session || payload.session_id,\n  commands: payload.input || payload.command || '',\n  event_type: payload.event || 'connection',\n  playbook_id: 'PB-H1-v1.0',\n  att_ck_technique: payload.dst_port === 2222 ? 'T1595' : 'T1046',\n  eventid: payload.eventid || '',\n  username: payload.username || null,\n  protocol: payload.protocol || 'ssh',\n  enrichment_data: null,\n  raw_data: payload\n};\n\nreturn [{ json: normalized }];"
+      },
+      "id": "function-normalize",
+      "name": "Normalizar Datos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        450,
+        300
+      ]
     },
-    "id": "function-normalize",
-    "name": "Normalizar Datos",
-    "type": "n8n-nodes-base.code",
-    "typeVersion": 2,
-    "position": [450, 300]
-  },
     {
       "parameters": {
         "method": "GET",
@@ -65,7 +71,10 @@
       "name": "AbuseIPDB Lookup",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
-      "position": [650, 300],
+      "position": [
+        650,
+        300
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "abuseipdb-cred-001",
@@ -93,7 +102,10 @@
       "name": "Shodan Lookup",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
-      "position": [850, 300],
+      "position": [
+        850,
+        300
+      ],
       "credentials": {
         "httpQueryAuth": {
           "id": "shodan-cred-001",
@@ -106,13 +118,16 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "// Calcular score de riesgo\n// Referencias a nodos hermanos de la rama de enriquecimiento (AbuseIPDB/Shodan/Normalizar)\nconst abuseItems = $('AbuseIPDB Lookup').all() || [];\nconst shodanItems = $('Shodan Lookup').all() || [];\nconst normalizedItems = $('Normalizar Datos').all() || [];\nconst base = (normalizedItems[0] && normalizedItems[0].json) ? normalizedItems[0].json : (($input.all()[0] && $input.all()[0].json) || {});\n\nconst abuseData = (abuseItems[0] && abuseItems[0].json && abuseItems[0].json.data) || {};\nconst shodanData = (shodanItems[0] && shodanItems[0].json) || {};\n\nlet score = 0;\n\n// Score por reputación AbuseIPDB\nconst abuseScore = abuseData.abuseConfidenceScore || 0;\nif (abuseScore > 50) score += 0.3;\nif (abuseScore > 80) score += 0.2;\n\n// Score por tipo de organización (hosting/cloud = más riesgoso)\nconst org = shodanData.org || '';\nif (org.toLowerCase().includes('hosting') || org.toLowerCase().includes('cloud')) {\n  score += 0.2;\n}\n\n// Score por múltiples puertos escaneados\nconst openPorts = shodanData.ports || [];\nif (openPorts.length > 5) score += 0.2;\n\n// Score por vulnerabilidades conocidas\nconst vulns = shodanData.vulns || [];\nif (vulns.length > 0) score += 0.2;\n\n// Normalizar score entre 0 y 1\nscore = Math.min(score, 1.0);\n\nreturn [{\n  json: {\n    ...base,\n    risk_score: score,\n    abuse_confidence: abuseScore,\n    organization: org,\n    open_ports_count: openPorts.length,\n    has_vulns: vulns.length > 0,\n    enrichment_timestamp: new Date().toISOString()\n  }\n}];"
+        "jsCode": "// Calcular score de riesgo (grupo 13: tabla de tiers por contenido del comando)\n// Referencias a nodos hermanos de la rama de enriquecimiento (AbuseIPDB/Shodan/Normalizar)\nconst abuseItems = $('AbuseIPDB Lookup').all() || [];\nconst shodanItems = $('Shodan Lookup').all() || [];\nconst normalizedItems = $('Normalizar Datos').all() || [];\nconst base = (normalizedItems[0] && normalizedItems[0].json) ? normalizedItems[0].json : (($input.all()[0] && $input.all()[0].json) || {});\n\nconst abuseData = (abuseItems[0] && abuseItems[0].json && abuseItems[0].json.data) || {};\nconst shodanData = (shodanItems[0] && shodanItems[0].json) || {};\n\n// ---------------------------------------------------------------------------\n// Tabla de tiers de riesgo por contenido del comando (grupo 13)\n// CRITICAL (base 0.85): destrucción de datos (rm -rf, mkfs, dd), shell inversa\n//   (bash -i >& | /dev/tcp | nc -e), pipe-a-shell (wget/curl | sh),\n//   escalada/persistencia (passwd, useradd, ssh-keygen, crontab) y apagado.\n// HIGH (base 0.70): descargas (wget/curl/scp), instalación de paquetes,\n//   netcat, kill de procesos, lectura de archivos sensibles (/etc/*) y\n//   anti-forense (history -c, shred).\n// MEDIUM (base 0.40): enumeración y reconocimiento benigno (whoami, id, ls...).\n// Sin match → 0 (la reputación/enriquecimiento puede sumar aparte).\n// Cada hit adicional dentro del tier suma \"step\", con techo \"cap\".\n// Los buckets de severidad de la API quedan: <0.33 low, <0.66 medium,\n// <0.85 high, >=0.85 critical.\n// ---------------------------------------------------------------------------\nconst COMMAND_TIERS = [\n  {\n    base: 0.85, step: 0.05, cap: 1.0,\n    patterns: [\n      /rm\\s+-[a-z]*r[a-z]*f/, /rm\\s+-[a-z]*f[a-z]*r/, /--no-preserve-root/,\n      /\\bmkfs\\b/, /\\bdd\\s+if=/, />\\s*\\/dev\\/(sd[a-z]|nvme|hd[a-z])\\b/,\n      /:\\(\\)\\s*\\{.*\\}\\s*;/,\n      /bash\\s+-i\\s+>&/, /\\/dev\\/tcp\\//,\n      /\\bnc(at)?\\b[^|;&]*\\s-e\\b/,\n      /\\|\\s*(ba|z|da|k)?sh\\b/,\n      /chmod\\s+777\\s+\\//, /\\bchown\\b[^;&]*\\s+\\//,\n      /\\/etc\\/shadow/, /\\/etc\\/sudoers/,\n      /\\bpasswd\\b/, /\\buseradd\\b/, /\\badduser\\b/, /\\busermod\\b/,\n      /\\bssh-keygen\\b/, /authorized_keys/,\n      /\\bcrontab\\b/, /\\/etc\\/rc\\.local/, /systemctl\\s+enable/,\n      /\\bshutdown\\b/, /\\breboot\\b/, /\\bhalt\\b/, /\\binit\\s+[06]\\b/\n    ]\n  },\n  {\n    base: 0.70, step: 0.04, cap: 0.84,\n    patterns: [\n      /\\bwget\\b/, /\\bcurl\\b/, /\\bscp\\b/, /\\btftp\\b/,\n      /\\bapt(-get)?\\s+install\\b/, /\\byum\\s+install\\b/, /\\bdnf\\s+install\\b/,\n      /\\bpacman\\s+-[su]\\b/, /\\bpip3?\\s+install\\b/, /\\bapk\\s+add\\b/,\n      /\\bnc(at)?\\b/, /\\bnetcat\\b/,\n      /\\bkill(all)?\\b/, /\\bpkill\\b/,\n      /\\b(cat|less|more|head|tail|strings)\\s+\\/etc\\//, /\\/etc\\/passwd/,\n      /\\bhistory\\s+-c\\b/, /unset\\s+histfile/, /\\bshred\\b/, /\\bwipe\\b/,\n      /\\bgcc\\b/, /\\bmake\\b/\n    ]\n  },\n  {\n    base: 0.40, step: 0.03, cap: 0.60,\n    patterns: [\n      /\\bwhoami\\b/, /\\bid\\b/, /\\buname\\b/, /\\bhostname\\b/, /\\buptime\\b/,\n      /\\bps\\b/, /\\bls\\b/, /\\bpwd\\b/, /\\benv\\b/, /\\bprintenv\\b/,\n      /\\bcat\\b/, /\\bfind\\b/, /\\bgrep\\b/, /\\bdiff\\b/, /\\bfile\\b/,\n      /\\bnmap\\b/, /\\bping\\b/, /\\bnslookup\\b/, /\\bdig\\b/, /\\btraceroute\\b/,\n      /\\bnetstat\\b/, /\\bss\\b/, /\\barp\\b/, /\\broute\\b/, /\\bifconfig\\b/, /\\bip\\s+addr\\b/,\n      /\\becho\\b/, /\\bprintf\\b/, /\\bsleep\\b/, /\\bcd\\b/, /\\bmkdir\\b/, /\\btouch\\b/\n    ]\n  }\n];\n\nfunction commandRiskScore(rawCommand) {\n  const cmd = String(rawCommand || '').toLowerCase();\n  if (!cmd.trim()) return 0;\n  let best = 0;\n  for (const tier of COMMAND_TIERS) {\n    let hits = 0;\n    for (const re of tier.patterns) {\n      if (re.test(cmd)) hits += 1;\n    }\n    if (hits > 0) {\n      const tierScore = Math.min(tier.base + (hits - 1) * tier.step, tier.cap);\n      if (tierScore > best) best = tierScore;\n    }\n  }\n  return Number(best.toFixed(2));\n}\n\n// El puntaje del comando es la base (garantiza el piso del tier);\n// el enriquecimiento externo suma encima, con techo 1.0.\nlet score = commandRiskScore(base.commands);\n\n// Score por reputación AbuseIPDB\nconst abuseScore = abuseData.abuseConfidenceScore || 0;\nif (abuseScore > 50) score += 0.3;\nif (abuseScore > 80) score += 0.2;\n\n// Score por tipo de organización (hosting/cloud = más riesgoso)\nconst org = shodanData.org || '';\nif (org.toLowerCase().includes('hosting') || org.toLowerCase().includes('cloud')) {\n  score += 0.2;\n}\n\n// Score por múltiples puertos escaneados\nconst openPorts = shodanData.ports || [];\nif (openPorts.length > 5) score += 0.2;\n\n// Score por vulnerabilidades conocidas\nconst vulns = shodanData.vulns || [];\nif (vulns.length > 0) score += 0.2;\n\n// Normalizar score entre 0 y 1\nscore = Math.min(score, 1.0);\n\nreturn [{\n  json: {\n    ...base,\n    risk_score: Number(score.toFixed(2)),\n    command_risk_tier: score >= 0.85 ? 'critical' : (score >= 0.66 ? 'high' : (score >= 0.33 ? 'medium' : 'low')),\n    abuse_confidence: abuseScore,\n    organization: org,\n    open_ports_count: openPorts.length,\n    has_vulns: vulns.length > 0,\n    enrichment_timestamp: new Date().toISOString()\n  }\n}];\n"
       },
       "id": "function-scoring",
       "name": "Calcular Risk Score",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1050, 300],
+      "position": [
+        1050,
+        300
+      ],
       "onError": "continueRegularOutput"
     },
     {
@@ -131,7 +146,10 @@
       "name": "¿Riesgo Alto? (≥0.8)",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [1250, 300],
+      "position": [
+        1250,
+        300
+      ],
       "onError": "continueRegularOutput"
     },
     {
@@ -155,13 +173,16 @@
       "name": "¿Riesgo Medio? (0.5-0.79)",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [1450, 300],
+      "position": [
+        1450,
+        300
+      ],
       "onError": "continueRegularOutput"
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "http://n8n:5678/webhook/firewall-block",
+        "url": "https://api.your-firewall.com/api/v1/block",
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
@@ -176,10 +197,6 @@
             {
               "name": "reason",
               "value": "Honeypot reconnaissance - PB-H1"
-            },
-            {
-              "name": "event_id",
-              "value": "={{ $json[\"event_id\"] }}"
             }
           ]
         },
@@ -189,7 +206,16 @@
       "name": "Bloqueo Firewall",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
-      "position": [1650, 200],
+      "position": [
+        1650,
+        200
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "firewall-cred-001",
+          "name": "Firewall_API"
+        }
+      },
       "onError": "continueRegularOutput"
     },
     {
@@ -215,7 +241,10 @@
       "name": "Slack Alerta Crítica",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
-      "position": [1850, 200],
+      "position": [
+        1850,
+        200
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "slack-cred-001",
@@ -234,31 +263,22 @@
       "name": "Esperar Aprobación Humana",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1,
-      "position": [1650, 400],
+      "position": [
+        1650,
+        400
+      ],
       "onError": "continueRegularOutput"
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "http://n8n:5678/webhook/glpi-ticket",
+        "url": "https://your-glpi-instance.com/apirest.php/Ticket",
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
             {
-              "name": "name",
-              "value": "=Honeypot Alert - {{ $json[\"src_ip\"] }}"
-            },
-            {
-              "name": "content",
-              "value": "=IP: {{ $json[\"src_ip\"] }}\nScore: {{ $json[\"risk_score\"] }}\nTécnica ATT&CK: {{ $json[\"att_ck_technique\"] }}"
-            },
-            {
-              "name": "urgency",
-              "value": "3"
-            },
-            {
-              "name": "event_id",
-              "value": "={{ $json[\"event_id\"] }}"
+              "name": "input",
+              "value": "={\"name\": \"Honeypot Alert - {{ $json[\"src_ip\"] }}\", \"content\": \"IP: {{ $json[\"src_ip\"] }}\\nScore: {{ $json[\"risk_score\"] }}\\nTécnica ATT&CK: {{ $json[\"att_ck_technique\"] }}\", \"urgency\": \"3\"}"
             }
           ]
         },
@@ -268,9 +288,13 @@
       "name": "Crear Ticket GLPI",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
-      "position": [1850, 400],
-      "onError": "continueRegularOutput"
-    }
+      "position": [
+        1850,
+        400
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "glpi-cred-001",
           "name": "GLPI_API"
         }
       },
@@ -288,7 +312,10 @@
       "name": "PostgreSQL Auditoría",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2,
-      "position": [2050, 300],
+      "position": [
+        2050,
+        300
+      ],
       "credentials": {
         "postgres": {
           "id": "postgres-cred-001",
@@ -312,7 +339,10 @@
       "name": "¿Comando Ejecutado?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [700, 520],
+      "position": [
+        700,
+        520
+      ],
       "notes": "Corrección C: desvío condicional hacia PB-H2. Si el evento normalizado contiene 'commands' no vacío (ejecución de comando, p.ej. eventid cowrie.command.input), sale por 'true' y dispara 'Ejecutar PB-H2'. La rama 'false' termina sin conexión (fin de rama). Mientras tanto, la cadena de enriquecimiento (AbuseIPDB/Shodan/Risk Score) corre para TODOS los eventos vía fan-out desde 'Normalizar Datos'. Diseño según design.md: PB-H2 corre cuando el evento contiene un comando."
     },
     {
@@ -327,33 +357,27 @@
       "name": "Ejecutar PB-H2",
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
-      "position": [900, 520],
+      "position": [
+        900,
+        520
+      ],
       "onError": "continueRegularOutput",
       "notes": "PB-H2 sub-workflow activo: workflowId apunta al id real del sub-workflow PB-H2 (nFnt9n3Gk8Gh27mg), importado sin webhook propio. Recibe el evento normalizado completo (commands, src_ip, raw_data, etc.). onError continueRegularOutput: si PB-H2 falla (p.ej. credenciales VirusTotal/Whois ausentes), la rama falla-open y NO rompe la respuesta del webhook ni la auditoría."
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ JSON.stringify({ status: 'processed', event_id: $json['event_id'] || ($json['src_ip'] + '-' + $json['timestamp']) }) }}",
+        "responseBody": "={{ JSON.stringify({ status: 'processed', event_id: $json['src_ip'] + '-' + $json['timestamp'] }) }}",
         "options": {}
       },
       "id": "respond-webhook",
       "name": "Responder Webhook",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [2250, 300]
-    },
-    {
-      "parameters": {
-        "mode": "runOnceForAllItems",
-        "language": "javaScript",
-        "jsCode": "// Merge: output de PostgreSQL (con event_id) + campos completos de Normalizar\nconst pgItem = $input.all()[0].json || {};\nconst normalizedItems = $('Normalizar Datos').all() || [];\nconst norm = (normalizedItems[0] && normalizedItems[0].json) ? normalizedItems[0].json : {};\n\nreturn [{\n  json: {\n    ...norm,\n    event_id: pgItem.id\n  }\n}];"
-      },
-      "id": "merge-event-id",
-      "name": "Merge Event ID",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [2250, 520]
+      "position": [
+        2250,
+        300
+      ]
     }
   ],
   "connections": {
@@ -373,6 +397,11 @@
         [
           {
             "node": "PostgreSQL Auditoría",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "¿Comando Ejecutado?",
             "type": "main",
             "index": 0
           },
@@ -484,22 +513,6 @@
       "main": [
         [
           {
-            "node": "Merge Event ID",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Merge Event ID": {
-      "main": [
-        [
-          {
-            "node": "¿Comando Ejecutado?",
-            "type": "main",
-            "index": 0
-          },
-          {
             "node": "Responder Webhook",
             "type": "main",
             "index": 0
@@ -513,23 +526,35 @@
     "saveManualExecutions": true,
     "callerPolicy": "workflowsFromSameOwner"
   },
-  "versionId": "pb-h1-v1.0-20260301",
+  "versionId": "5e8730b4-6f3f-40fe-98ed-164d6517d5f3",
   "meta": {
     "instanceId": "honeypot-soc-n8n",
     "templateCredsSetupCompleted": true
   },
   "tags": [
     {
-      "name": "PB-H1"
+      "updatedAt": "2026-08-10T19:35:57.921Z",
+      "createdAt": "2026-08-10T19:35:57.921Z",
+      "id": "J3GoJ24X9nzx9w0T",
+      "name": "T1046"
     },
     {
-      "name": "Reconocimiento"
-    },
-    {
+      "updatedAt": "2026-08-10T19:35:57.921Z",
+      "createdAt": "2026-08-10T19:35:57.921Z",
+      "id": "nKz4RzuBw2B7FPNI",
       "name": "T1595"
     },
     {
-      "name": "T1046"
+      "updatedAt": "2026-08-10T19:35:57.921Z",
+      "createdAt": "2026-08-10T19:35:57.921Z",
+      "id": "bYc8FXw8qPxy8uhi",
+      "name": "Reconocimiento"
+    },
+    {
+      "updatedAt": "2026-08-10T19:35:57.921Z",
+      "createdAt": "2026-08-10T19:35:57.921Z",
+      "id": "smUF8XRb3mRS13sK",
+      "name": "PB-H1"
     }
   ]
 }

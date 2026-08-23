@@ -266,16 +266,49 @@ a:focus-visible {
   background: rgba(239, 68, 68, 0.16);
 }
 
+/* Páginas fuera del shell (login, 404): pantalla completa centrada */
+.standalone-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 24px;
+  background: var(--bg-base);
+}
+
 /* Login */
 .login-card {
-  max-width: 360px;
+  width: 100%;
+  max-width: 380px;
+  padding: 28px;
+}
+
+.nf-card {
+  width: 100%;
+  max-width: 420px;
+  padding: 32px;
+}
+
+.login-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-align: center;
+}
+
+.login-subtitle {
+  margin: 6px 0 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  text-align: center;
 }
 
 .login-form {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding: 24px;
+  margin-top: 24px;
 }
 
 .login-field {

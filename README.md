@@ -96,6 +96,70 @@ curl -u "$GRAFANA_ADMIN_USER:$GRAFANA_ADMIN_PASSWORD" "http://localhost:${GRAFAN
 
 ---
 
+## Consola Web SOC
+
+Interfaz web (SPA React) que consume la API del SOC (`soc-api`) para visualizar la telemetría de los honeypots y ejecutar acciones de respuesta automatizada a través de n8n.
+
+### Acceso
+
+* URL: `http://localhost/` (servida por nginx)
+* Login: usuario y contraseña definidos en las variables `SOC_ADMIN_USER` / `SOC_ADMIN_PASSWORD` del archivo `.env` (la sesión se emite como cookie JWT `HttpOnly` firmada con `SOC_JWT_SECRET`, expiración 8 h)
+
+### Arquitectura
+
+```
+browser → nginx :80 → soc-web (SPA estática)
+                    → /api/  → soc-api (FastAPI) → PostgreSQL
+                                                → n8n (workflows de respuesta)
+```
+
+* `nginx` enruta `location /` al build estático (`soc-web`) y `location /api/` a la API (`soc-api`), sin exponer puertos de estos servicios al host.
+* La API lee directamente de PostgreSQL y delega las acciones de automatización a los webhooks de n8n (`/webhook/cowrie`, `/webhook/dionaea`, `/webhook/firewall-block`, `/webhook/glpi-ticket`).
+* El feed de *Ataques en Vivo* usa SSE (`GET /api/v1/events/live`) con fallback automático a polling.
+
+### Pantallas
+
+| Pantalla                  | Ruta             | Contenido                                                                 |
+| ------------------------- | ---------------- | ------------------------------------------------------------------------- |
+| Resumen del SOC           | `/`              | Total de ataques, alertas críticas, IPs únicas, MTTD/MTTR, top atacantes   |
+| Ataques en Vivo           | `/live`          | Feed SSE de eventos en tiempo real, indicador eventos/seg, amenaza activa  |
+| Explorador de Eventos     | `/eventos`       | Filtros, paginación, exportación CSV, detalle con `raw_data` y respuestas  |
+| Matriz MITRE ATT&CK       | `/mitre`         | Técnicas detectadas agrupadas por táctica                                  |
+| Mapa Geográfico           | `/mapa`          | Origen geográfico de los ataques (mapa vectorial offline)                  |
+| Malware & IoC             | `/malware`       | Hashes únicos capturados por Dionaea y tabla de IoCs                       |
+| Automatización y Respuesta| `/automatizacion`| Estado de workflows y ejecuciones n8n, historial de respuestas             |
+
+Desde **Automatización** se disparan tres acciones sobre n8n: simular ataque (cowrie/dionaea), bloquear IP (firewall) y crear ticket GLPI; cada acción queda registrada en la tabla `responses`.
+
+### Variables de entorno
+
+Nuevas para la consola (en `.env`; `.env.example` incluye placeholders vacíos):
+
+```env
+SOC_ADMIN_USER=
+SOC_ADMIN_PASSWORD=
+SOC_JWT_SECRET=
+```
+
+`N8N_API_KEY` y `POSTGRES_*` ya existían para el stack anterior y son reutilizadas por la API.
+
+### Verificación rápida
+
+```bash
+# Salud de la API (público)
+curl http://localhost/api/v1/health
+
+# Login (guarda la cookie de sesión)
+curl -c cookies.txt -X POST http://localhost/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d "{\"username\":\"$SOC_ADMIN_USER\",\"password\":\"$SOC_ADMIN_PASSWORD\"}"
+
+# Métricas del overview (autenticado)
+curl -b cookies.txt http://localhost/api/v1/overview
+```
+
+---
+
 ## Funcionalidades
 
 * Captura automatizada de eventos

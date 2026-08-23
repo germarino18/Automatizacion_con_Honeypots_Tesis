@@ -10,6 +10,7 @@ const SECTION_BY_PATH: Array<[string, string]> = [
   ['/mapa', 'Mapa Geográfico'],
   ['/malware', 'Malware & IoC'],
   ['/automatizacion', 'Automatización y Respuesta'],
+  ['/workflows', 'Workflows n8n'],
   ['/login', 'Iniciar sesión'],
 ];
 

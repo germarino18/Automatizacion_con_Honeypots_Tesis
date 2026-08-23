@@ -1,7 +1,6 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 
-import Header from '../components/Header';
-import Sidebar from '../components/Sidebar';
+import AppShell from '../components/AppShell';
 import { AuthProvider } from '../features/auth/AuthContext';
 import RequireAuth from '../features/auth/RequireAuth';
 import AtaquesEnVivo from '../features/live-feed/AtaquesEnVivo';
@@ -12,78 +11,36 @@ import MalwareIoc from '../features/malware/MalwareIoc';
 import MapaGeografico from '../features/geo-map/MapaGeografico';
 import MatrizMitre from '../features/mitre/MatrizMitre';
 import Resumen from '../features/overview/Resumen';
+import WorkflowsN8n from '../features/workflows/WorkflowsN8n';
 import NoEncontrado from './NoEncontrado';
 
 export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <div className="app-shell">
-          <Sidebar />
-          <div className="app-main">
-            <Header />
-            <Routes>
-              <Route path="/login" element={<Login />} />
-              <Route
-                path="/"
-                element={
-                  <RequireAuth>
-                    <Resumen />
-                  </RequireAuth>
-                }
-              />
-              <Route
-                path="/live"
-                element={
-                  <RequireAuth>
-                    <AtaquesEnVivo />
-                  </RequireAuth>
-                }
-              />
-              <Route
-                path="/eventos"
-                element={
-                  <RequireAuth>
-                    <ExploradorEventos />
-                  </RequireAuth>
-                }
-              />
-              <Route
-                path="/mitre"
-                element={
-                  <RequireAuth>
-                    <MatrizMitre />
-                  </RequireAuth>
-                }
-              />
-              <Route
-                path="/mapa"
-                element={
-                  <RequireAuth>
-                    <MapaGeografico />
-                  </RequireAuth>
-                }
-              />
-              <Route
-                path="/malware"
-                element={
-                  <RequireAuth>
-                    <MalwareIoc />
-                  </RequireAuth>
-                }
-              />
-              <Route
-                path="/automatizacion"
-                element={
-                  <RequireAuth>
-                    <Automatizacion />
-                  </RequireAuth>
-                }
-              />
-              <Route path="*" element={<NoEncontrado />} />
-            </Routes>
-          </div>
-        </div>
+        <Routes>
+          {/* Rutas fuera del shell (sin Sidebar/Header) */}
+          <Route path="/login" element={<Login />} />
+          <Route path="*" element={<NoEncontrado />} />
+
+          {/* Shell privado: Sidebar + Header + pantallas protegidas */}
+          <Route
+            element={
+              <RequireAuth>
+                <AppShell />
+              </RequireAuth>
+            }
+          >
+            <Route index element={<Resumen />} />
+            <Route path="/live" element={<AtaquesEnVivo />} />
+            <Route path="/eventos" element={<ExploradorEventos />} />
+            <Route path="/mitre" element={<MatrizMitre />} />
+            <Route path="/mapa" element={<MapaGeografico />} />
+            <Route path="/malware" element={<MalwareIoc />} />
+            <Route path="/automatizacion" element={<Automatizacion />} />
+            <Route path="/workflows" element={<WorkflowsN8n />} />
+          </Route>
+        </Routes>
       </BrowserRouter>
     </AuthProvider>
   );

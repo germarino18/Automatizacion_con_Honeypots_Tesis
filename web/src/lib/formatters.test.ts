@@ -5,7 +5,18 @@ import {
   formatInteger,
   formatRiskScore,
   formatTimestamp,
+  parseUtcDate,
 } from './formatters';
+
+/** Reconstruye la hora local esperada con los getters nativos del host. */
+function expectedLocalParts(value: string): string {
+  const date = new Date(value);
+  const pad = (part: number): string => part.toString().padStart(2, '0');
+  return (
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ` +
+    `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+  );
+}
 
 describe('formatDuration', () => {
   it('devuelve "—" para valores nulos o no finitos', () => {
@@ -62,13 +73,54 @@ describe('formatRiskScore', () => {
   });
 });
 
+describe('parseUtcDate', () => {
+  it('trata los ISO naive (sin zona) como UTC', () => {
+    const naive = parseUtcDate('2026-03-05T14:23:09');
+    const explicit = parseUtcDate('2026-03-05T14:23:09Z');
+    expect(naive).not.toBeNull();
+    expect(naive?.getTime()).toBe(explicit?.getTime());
+  });
+
+  it('respeta los offsets explícitos (+hh:mm)', () => {
+    const offset = parseUtcDate('2026-03-05T14:23:09+02:00');
+    expect(offset?.getTime()).toBe(
+      parseUtcDate('2026-03-05T12:23:09Z')?.getTime(),
+    );
+  });
+
+  it('acepta separador de espacio en lugar de "T"', () => {
+    const spaced = parseUtcDate('2026-03-05 14:23:09');
+    expect(spaced?.getTime()).toBe(
+      parseUtcDate('2026-03-05T14:23:09Z')?.getTime(),
+    );
+  });
+
+  it('devuelve null para entradas inválidas o vacías', () => {
+    expect(parseUtcDate('no-es-fecha')).toBeNull();
+    expect(parseUtcDate('')).toBeNull();
+  });
+});
+
 describe('formatTimestamp', () => {
-  it('renderiza fecha y hora UTC con ceros rellenados', () => {
+  it('renderiza fecha y hora en la zona LOCAL del host', () => {
     expect(formatTimestamp('2026-03-05T14:23:09Z')).toBe(
-      '2026-03-05 14:23:09',
+      expectedLocalParts('2026-03-05T14:23:09Z'),
     );
     expect(formatTimestamp('2026-01-01T00:00:00Z')).toBe(
-      '2026-01-01 00:00:00',
+      expectedLocalParts('2026-01-01T00:00:00Z'),
+    );
+  });
+
+  it('muestra lo mismo para instantes idénticos expresados con zona distinta', () => {
+    expect(formatTimestamp('2026-03-05T12:23:09Z')).toBe(
+      formatTimestamp('2026-03-05T14:23:09+02:00'),
+    );
+  });
+
+  it('no desplaza la hora cuando el backend envía ISO naive', () => {
+    // El mismo instante: naive (interpretado UTC) debe renderizar igual que su gemelo con Z
+    expect(formatTimestamp('2026-03-05T14:23:09')).toBe(
+      formatTimestamp('2026-03-05T14:23:09Z'),
     );
   });
 

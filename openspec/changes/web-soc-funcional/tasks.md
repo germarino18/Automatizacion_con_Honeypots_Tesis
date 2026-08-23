@@ -104,14 +104,14 @@
 
 ## 12. Verificación integral y cierre
 
-- [ ] 12.1 `docker compose up -d` → `soc-api` y `soc-web` en estado running/healthy; `docker compose ps` lista 8 servicios sin Exit/Unhealthy
+- [x] 12.1 `docker compose up -d` → `soc-api` y `soc-web` en estado running/healthy; `docker compose ps` lista los 9 servicios del stack (sidecar incluido) sin Exit/Unhealthy
 - [ ] 12.2 Login en la consola web (`http://localhost/`) con credenciales SOC del `.env` → redirige al Resumen del SOC con métricas reales de `honeypot_events`
 - [ ] 12.3 Abrir Ataques en Vivo, generar un evento (simulación desde la UI de Automatización o `docker exec`/curl a un honeypot) y confirmar que aparece en el feed SIN recargar la página (<= 5s)
 - [ ] 12.4 Explorar eventos con filtros, paginar, exportar CSV y abrir el detalle de un evento (raw_data + respuestas)
-- [ ] 12.5 Ejecutar una simulación de ataque desde la UI de Automatización y confirmar que el evento resultante aparece en el Explorador y en el feed en vivo
-- [ ] 12.6 Bloquear una IP desde la UI y confirmar que aparece un registro en `responses` (`action_type='bloqueo'`, `actor='n8n-automated'`)
-- [ ] 12.7 Crear un ticket GLPI desde la UI y confirmar que aparece un registro en `responses` (`action_type='alerta'`, `actor='n8n-automated'`)
-- [ ] 12.8 Regresión del stack existente: repetir verificaciones de `diagnostico-cadena` — healthz de n8n (host y red interna), POST de prueba a `/webhook/cowrie` y `/webhook/dionaea`, persistencia de un evento real, acceso a Grafana (`http://localhost/grafana/`) con dashboards OK
-- [ ] 12.9 Revisión final de secretos: `git grep -iE "(password|secret).*=.+[A-Za-z0-9]{8,}"` sobre los archivos nuevos NO debe arrojar credenciales reales
-- [ ] 12.10 Documentar en README (sección "Consola Web SOC"): acceso, login, arquitectura (api/web/nginx), acciones de automatización, variables nuevas del `.env` y verificación rápida (curl a health/login/overview)
-- [ ] 12.11 Confirmar `openspec status --change web-soc-funcional` con todos los artifacts completos y listo para `/opsx:apply`
+- [x] 12.5 Ejecutar una simulación de ataque desde la UI de Automatización y confirmar que el evento resultante aparece en el Explorador y en el feed en vivo *(verificado por backend: `POST /api/v1/automation/simulate` — el mismo endpoint que invoca la UI — insertó el evento id=63 vía n8n, visible en `GET /events` y recibido por SSE en <1 s)*
+- [x] 12.6 Bloquear una IP desde la UI y confirmar que aparece un registro en `responses` (`action_type='bloqueo'`, `actor='n8n-automated'`) *(verificado vía API: `POST /api/v1/automation/block-ip` → fila id=8 con IP 203.0.113.77, reason verificacion-g12)*
+- [x] 12.7 Crear un ticket GLPI desde la UI y confirmar que aparece un registro en `responses` (`action_type='alerta'`, `actor='n8n-automated'`) *(verificado vía API: `POST /api/v1/automation/create-ticket` → fila id=9, ticket "Verificacion G12")*
+- [x] 12.8 Regresión del stack existente: repetir verificaciones de `diagnostico-cadena` — healthz de n8n (host y red interna), POST de prueba a `/webhook/cowrie` y `/webhook/dionaea`, persistencia de un evento real, acceso a Grafana (`http://localhost/grafana/`) con dashboards OK
+- [x] 12.9 Revisión final de secretos: `git grep -iE "(password|secret).*=.+[A-Za-z0-9]{8,}"` sobre los archivos nuevos NO debe arrojar credenciales reales
+- [x] 12.10 Documentar en README (sección "Consola Web SOC"): acceso, login, arquitectura (api/web/nginx), acciones de automatización, variables nuevas del `.env` y verificación rápida (curl a health/login/overview)
+- [x] 12.11 Confirmar `openspec status --change web-soc-funcional` con todos los artifacts completos y listo para `/opsx:apply`

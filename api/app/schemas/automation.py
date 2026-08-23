@@ -16,6 +16,7 @@ class WorkflowItem(BaseModel):
     id: int | str
     name: str
     active: bool
+    updated_at: datetime | None = None
 
 
 class WorkflowsResponse(BaseModel):

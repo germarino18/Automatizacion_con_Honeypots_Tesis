@@ -291,6 +291,7 @@ export interface WorkflowItem {
   id: number | string;
   name: string;
   active: boolean;
+  updated_at?: string | null;
 }
 
 export interface WorkflowsResponse {
