@@ -79,7 +79,7 @@
 - [x] 9.1 Pantalla `Login.tsx`: formulario usuario/contraseña que llama `POST /api/v1/auth/login` (credentials include), maneja error de credenciales en pantalla y redirige a `/` al éxito
 - [x] 9.2 Contexto de sesión (`AuthContext`): estado autenticado, función logout (llama `POST /api/v1/auth/logout` y limpia estado), persistencia del estado durante la sesión
 - [x] 9.3 Guard de rutas: `<RequireAuth>` que redirige a `/login` si no hay sesión; ruta 404 para rutas desconocidas
-- [ ] 9.4 Verificación manual: sin sesión → redirect a login; login válido → dashboard; logout → login; acceso a ruta protegida sin sesión → login
+- [x] 9.4 Verificación manual: sin sesión → redirect a login; login válido → dashboard; logout → login; acceso a ruta protegida sin sesión → login *(verificado por el usuario en pase visual post-fix G13: login sin sidebar y guards OK)*
 
 ## 10. Frontend — Pantallas (spec web-soc-ui)
 
@@ -91,7 +91,7 @@
 - [x] 10.6 **Malware & IoC** (`/malware`): consume `/malware` y `/iocs` — hashes únicos con detalle, tabla de IoCs con filtro por tipo/severidad y búsqueda por valor
 - [x] 10.7 **Automatización y Respuesta** (`/automatizacion`): consume `/automation/workflows`, `/automation/executions`, `/automation/responses` — estado de pipelines n8n, historial de ejecuciones y respuestas; acciones: simular ataque (modal con honeypot + payload), bloquear IP (modal con IP + razón + duration opcional) y crear ticket GLPI (modal con nombre, contenido y urgencia); estado degradado deshabilita acciones
 - [x] 10.8 Aplicar design system en todas las pantallas: badges de severidad con colores semánticos, telemetría (IPs/hashes/IDs MITRE) en JetBrains Mono, layout denso con sidebar fijo
-- [ ] 10.9 Verificación manual end-to-end del frontend: navegar todas las pantallas con el stack arriba, verificar render con datos reales, estados vacíos y errores de API
+- [x] 10.9 Verificación manual end-to-end del frontend: navegar todas las pantallas con el stack arriba, verificar render con datos reales, estados vacíos y errores de API *(pase visual del usuario: resumen, live, mitre, mapa, malware y automatización OK; explorador con filtros + export CSV OK)*
 
 ## 11. Despliegue en docker-compose y nginx (design D7, spec despliegue-web)
 
@@ -105,9 +105,9 @@
 ## 12. Verificación integral y cierre
 
 - [x] 12.1 `docker compose up -d` → `soc-api` y `soc-web` en estado running/healthy; `docker compose ps` lista los 9 servicios del stack (sidecar incluido) sin Exit/Unhealthy
-- [ ] 12.2 Login en la consola web (`http://localhost/`) con credenciales SOC del `.env` → redirige al Resumen del SOC con métricas reales de `honeypot_events`
-- [ ] 12.3 Abrir Ataques en Vivo, generar un evento (simulación desde la UI de Automatización o `docker exec`/curl a un honeypot) y confirmar que aparece en el feed SIN recargar la página (<= 5s)
-- [ ] 12.4 Explorar eventos con filtros, paginar, exportar CSV y abrir el detalle de un evento (raw_data + respuestas)
+- [x] 12.2 Login en la consola web (`http://localhost/`) con credenciales SOC del `.env` → redirige al Resumen del SOC con métricas reales de `honeypot_events` *(confirmado por el usuario en pase visual)*
+- [x] 12.3 Abrir Ataques en Vivo, generar un evento (simulación desde la UI de Automatización o `docker exec`/curl a un honeypot) y confirmar que aparece en el feed SIN recargar la página (<= 5s) *(confirmado por el usuario; backend medido en 0.16s durante G12)*
+- [x] 12.4 Explorar eventos con filtros, paginar, exportar CSV y abrir el detalle de un evento (raw_data + respuestas) *(confirmado por el usuario: filtros y CSV OK; severidades corregidas con tiers reales + backfill 28 filas)*
 - [x] 12.5 Ejecutar una simulación de ataque desde la UI de Automatización y confirmar que el evento resultante aparece en el Explorador y en el feed en vivo *(verificado por backend: `POST /api/v1/automation/simulate` — el mismo endpoint que invoca la UI — insertó el evento id=63 vía n8n, visible en `GET /events` y recibido por SSE en <1 s)*
 - [x] 12.6 Bloquear una IP desde la UI y confirmar que aparece un registro en `responses` (`action_type='bloqueo'`, `actor='n8n-automated'`) *(verificado vía API: `POST /api/v1/automation/block-ip` → fila id=8 con IP 203.0.113.77, reason verificacion-g12)*
 - [x] 12.7 Crear un ticket GLPI desde la UI y confirmar que aparece un registro en `responses` (`action_type='alerta'`, `actor='n8n-automated'`) *(verificado vía API: `POST /api/v1/automation/create-ticket` → fila id=9, ticket "Verificacion G12")*

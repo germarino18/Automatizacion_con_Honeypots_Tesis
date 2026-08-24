@@ -1239,6 +1239,12 @@ a:focus-visible {
 
 .automation-panels {
   grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  align-items: start;
+}
+
+.automation-responses-scroll {
+  max-height: 400px;
+  overflow-y: auto;
 }
 
 /* ---- Modales de acciones SOAR ---- */

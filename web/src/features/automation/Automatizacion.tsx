@@ -89,7 +89,7 @@ function ExecutionsTable({
 
 function ResponsesTable({ items }: { items: ResponseItem[] }) {
   return (
-    <div className="table-scroll">
+    <div className="table-scroll automation-responses-scroll">
       <table className="data-table">
         <thead>
           <tr>

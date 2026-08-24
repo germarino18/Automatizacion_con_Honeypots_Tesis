@@ -303,7 +303,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO honeypot_events (timestamp, source_honeypot, src_ip, dst_port, protocol, username, commands, playbook_id, risk_score, att_ck_technique, enrichment_data, raw_data) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CAST($11 AS jsonb), CAST($12 AS jsonb)) RETURNING id, timestamp, src_ip",
+        "query": "INSERT INTO honeypot_events (timestamp, source_honeypot, src_ip, dst_port, protocol, username, commands, playbook_id, risk_score, att_ck_technique, enrichment_data, raw_data) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CAST($11 AS jsonb), CAST($12 AS jsonb)) RETURNING id AS event_id, timestamp, src_ip, dst_port, protocol, username, commands, playbook_id, att_ck_technique",
         "options": {
           "queryReplacement": "={{ $json[\"timestamp\"] }},={{ $json[\"source_honeypot\"] }},={{ $json[\"src_ip\"] }},={{ $json[\"dst_port\"] }},={{ $json[\"protocol\"] }},={{ $json[\"username\"] }},={{ $json[\"commands\"] }},={{ $json[\"playbook_id\"] }},={{ $json[\"risk_score\"] || 0 }},={{ $json[\"att_ck_technique\"] }},={{ $json[\"enrichment_data\"] }},={{ $json[\"raw_data\"] }}"
         }
@@ -343,7 +343,7 @@
         700,
         520
       ],
-      "notes": "Corrección C: desvío condicional hacia PB-H2. Si el evento normalizado contiene 'commands' no vacío (ejecución de comando, p.ej. eventid cowrie.command.input), sale por 'true' y dispara 'Ejecutar PB-H2'. La rama 'false' termina sin conexión (fin de rama). Mientras tanto, la cadena de enriquecimiento (AbuseIPDB/Shodan/Risk Score) corre para TODOS los eventos vía fan-out desde 'Normalizar Datos'. Diseño según design.md: PB-H2 corre cuando el evento contiene un comando."
+      "notes": "Corrección C (rev. grupo 13): recibe la FILA insertada por 'PostgreSQL Auditoría' (RETURNING id AS event_id, commands, ...) para que 'Ejecutar PB-H2' reciba el id real de honeypot_events. Si commands <> '' sale por 'true'."
     },
     {
       "parameters": {
@@ -397,11 +397,6 @@
         [
           {
             "node": "PostgreSQL Auditoría",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "¿Comando Ejecutado?",
             "type": "main",
             "index": 0
           },
@@ -514,6 +509,11 @@
         [
           {
             "node": "Responder Webhook",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "¿Comando Ejecutado?",
             "type": "main",
             "index": 0
           }
