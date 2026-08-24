@@ -35,5 +35,5 @@
 - [x] 6.1 Ejecutar tests API: `powershell -ExecutionPolicy Bypass -File api\run-tests.ps1` (esperado 162/162)
 - [x] 6.2 Ejecutar tests web: `cd web && pnpm test` (127), `pnpm lint` y `pnpm build`
 - [x] 6.3 Verificación manual de compose: recrear stack (`docker compose up -d`) y comprobar binds `127.0.0.1` para n8n/Grafana y acceso legítimo desde la VM o túnel SSH
-- [ ] 6.4 Verificación manual de firewall: aplicar `firewall/setup-ufw.sh` en VM de prueba, comprobar DNS/HTTPS salientes OK, puerto arbitrario saliente bloqueado y rollback documentado (`ufw disable`)
+- [ ] 6.4 Verificación manual de firewall: aplicar `firewall/setup-ufw.sh` en VM de prueba, comprobar DNS/HTTPS salientes OK, puerto arbitrario saliente bloqueado y rollback documentado (`ufw disable`) [!] Verificación en VM pendiente - requiere host Linux
 - [x] 6.5 Ejecutar una sesión de ataque de prueba end-to-end y verificar que PB-H2 consulta VT por dominio sin URLs `undefined` y que la cadena de respuesta automática sigue operativa
