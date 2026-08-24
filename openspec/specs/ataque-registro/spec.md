@@ -16,14 +16,14 @@ El playbook **PB-H1** (workflow "PB-H1 - Reconocimiento y Escaneo") SHALL expone
 - **AND** PB-H2 procesa el comando (extracción de IOCs, enriquecimiento, scoring) y persiste
 
 ### Requirement: El sistema DEBE recibir eventos de Dionaea vía webhook
-El workflow "Dionaea Webhook" SHALL exponer un endpoint POST en `/webhook/dionaea` que acepte datos JSON de eventos de servicios (SMB, FTP, HTTP, etc.).
+El workflow "PB-DIONAEA - Ingesta de Eventos Dionaea" SHALL exponer un endpoint POST en `/webhook/dionaea` que acepte datos JSON de eventos de servicios (SMB, FTP, HTTP, etc.).
 
 #### Scenario: Dionaea envía evento de conexión
 - **WHEN** el sidecar unificado envía un POST a `http://n8n:5678/webhook/dionaea` con un payload JSON de un evento de Dionaea que contiene `remote_host`, `remote_port`, `local_port`, `protocol` y `timestamp`
 - **THEN** el workflow recibe el evento y lo procesa sin errores
 
 ### Requirement: Los eventos SHALL persistirse en PostgreSQL
-Cada workflow (PB-H1, PB-H2, Dionaea Webhook) SHALL insertar un registro en la tabla `honeypot_events` de PostgreSQL con los siguientes campos:
+Cada workflow (PB-H1, PB-H2, PB-DIONAEA) SHALL insertar un registro en la tabla `honeypot_events` de PostgreSQL con los siguientes campos:
 
 | Campo | Tipo | Descripción |
 |-------|------|-------------|

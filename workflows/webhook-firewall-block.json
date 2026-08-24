@@ -1,6 +1,6 @@
 {
   "id": "soc-firewall-block-01",
-  "name": "SOC - Firewall Block Endpoint",
+  "name": "PB-R1 - Respuesta Automatica: Bloqueo de IP (Firewall)",
   "nodes": [
     {
       "parameters": {

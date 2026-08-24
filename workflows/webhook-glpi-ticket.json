@@ -1,6 +1,6 @@
 {
   "id": "soc-glpi-ticket-01",
-  "name": "SOC - GLPI Ticket Endpoint",
+  "name": "PB-R2 - Respuesta Automatica: Creacion de Tickets (GLPI)",
   "nodes": [
     {
       "parameters": {
