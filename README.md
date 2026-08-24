@@ -188,6 +188,16 @@ git clone https://github.com/germarino18/Automatizacion_con_Honeypots_Tesis
 cd Automatizacion_con_Honeypots_Tesis
 ```
 
+### Configurar variables de entorno
+
+El stack se configura íntegramente desde `.env`; sin este paso los contenedores levantan sin credenciales válidas.
+
+```bash
+cp .env.example .env
+```
+
+Completar al menos las variables obligatorias: `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB`, `N8N_BASIC_AUTH_*` y `N8N_ENCRYPTION_KEY`, `WEBHOOK_URL`, puertos de honeypots (`COWRIE_*`, `DIONAEA_*`), credenciales de Grafana (`GRAFANA_*`), subredes (`NETWORK_DMZ_SUBNET`, `NETWORK_INTERNAL_SUBNET`) y las de la consola SOC (`SOC_ADMIN_USER`, `SOC_ADMIN_PASSWORD`, `SOC_JWT_SECRET`). Para la API pública de n8n, crear la clave en la UI (Settings > n8n API) y cargarla en `N8N_API_KEY`.
+
 ### Levantar servicios
 
 ```bash
@@ -202,11 +212,13 @@ Ejemplo:
 
 ```env
 POSTGRES_USER=postgres
-POSTGRES_PASSWORD=password
+POSTGRES_PASSWORD=cambia-esta-clave-segura
 POSTGRES_DB=honeypots
 N8N_BASIC_AUTH_USER=admin
-N8N_BASIC_AUTH_PASSWORD=admin
+N8N_BASIC_AUTH_PASSWORD=cambia-esta-clave-segura
 ```
+
+> Todos los valores son placeholders de ejemplo: reemplázalos por credenciales fuertes en tu `.env` (nunca subas valores reales al repositorio).
 
 ---
 

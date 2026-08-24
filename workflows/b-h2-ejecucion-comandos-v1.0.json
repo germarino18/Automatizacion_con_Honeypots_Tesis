@@ -35,8 +35,47 @@
     },
     {
       "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ ($json[\"extracted_domains\"] || []).length }}",
+              "operation": "larger",
+              "value2": "0"
+            }
+          ]
+        }
+      },
+      "id": "if-has-domains",
+      "name": "¿Hay Dominios?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        650,
+        300
+      ],
+      "notes": "Hardening #5 (Opción A): solo divide/consulta VT si Extraer IOCs produjo extracted_domains; sin dominios el flujo va directo al scoring para no cortar la cadena ni emitir peticiones inválidas."
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Hardening #5 (Opción A): divide extracted_domains en items {domain}\n// para que \"VirusTotal Lookup\" consulte /api/v3/domains/<domain> por IoC.\n// Cada item derivado conserva los campos base del evento.\nconst out = [];\nfor (const item of $input.all()) {\n  const base = item.json || {};\n  const raw = Array.isArray(base.extracted_domains) ? base.extracted_domains : [];\n  const unique = [...new Set(raw.filter(d => typeof d === 'string' && d.trim().length > 0))].map(d => d.trim());\n  for (const domain of unique) {\n    out.push({ json: { ...base, domain } });\n  }\n}\nreturn out;"
+      },
+      "id": "split-extracted-domains",
+      "name": "Dividir Dominios",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        850,
+        180
+      ],
+      "onError": "continueRegularOutput",
+      "notes": "Hardening #5 (Opción A): un item por dominio único; cada item conserva el evento base más la propiedad domain."
+    },
+    {
+      "parameters": {
         "method": "GET",
-        "url": "https://www.virustotal.com/api/v3/files/{{ $json[\"file_hash\"] }}",
+        "url": "=https://www.virustotal.com/api/v3/domains/{{ $json[\"domain\"] }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -53,8 +92,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
       "position": [
-        650,
-        300
+        1050,
+        180
       ],
       "credentials": {
         "httpHeaderAuth": {
@@ -62,7 +101,10 @@
           "name": "VirusTotal_API"
         }
       },
-      "onError": "continueRegularOutput"
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
@@ -88,8 +130,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
       "position": [
-        850,
-        300
+        1250,
+        180
       ],
       "credentials": {
         "httpQueryAuth": {
@@ -103,14 +145,14 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "// Calcular score de riesgo para comandos (grupo 13: tabla de tiers)\n// Referencias a nodos de enriquecimiento (VirusTotal/WHOIS) con fallback\n// base: evento limpio desde Extraer IOCs (robusto aunque el enriquecimiento falle)\nconst baseItems = $('Extraer IOCs').all() || [];\nconst base = (baseItems[0] && baseItems[0].json) ? baseItems[0].json : (($input.all()[0] && $input.all()[0].json) || {});\nconst vtItems = $('VirusTotal Lookup').all() || [];\nconst whoisItems = $('WHOIS Domain').all() || [];\n\nconst vtData = (vtItems[0] && vtItems[0].json && vtItems[0].json.data) || {};\nconst whoisData = (whoisItems[0] && whoisItems[0].json) || {};\n\n// ---------------------------------------------------------------------------\n// Tabla de tiers de riesgo por contenido del comando (grupo 13)\n// CRITICAL (base 0.85): destruccion de datos (rm -rf, mkfs, dd), shell inversa\n//   (bash -i >& | /dev/tcp | nc -e), pipe-a-shell (wget/curl | sh),\n//   escalada/persistencia (passwd, useradd, ssh-keygen, crontab) y apagado.\n// HIGH (base 0.70): descargas (wget/curl/scp), instalacion de paquetes,\n//   netcat, kill de procesos, lectura de archivos sensibles (/etc/*) y\n//   anti-forense (history -c, shred).\n// MEDIUM (base 0.40): enumeracion y reconocimiento benigno (whoami, id, ls...).\n// Sin match -> 0 (el enriquecimiento VT/WHOIS puede sumar aparte).\n// Cada hit adicional dentro del tier suma \"step\", con techo \"cap\".\n// Los buckets de severidad de la API quedan: <0.33 low, <0.66 medium,\n// <0.85 high, >=0.85 critical.\n// ---------------------------------------------------------------------------\nconst COMMAND_TIERS = [\n  {\n    base: 0.85, step: 0.05, cap: 1.0,\n    patterns: [\n      /rm\\s+-[a-z]*r[a-z]*f/, /rm\\s+-[a-z]*f[a-z]*r/, /--no-preserve-root/,\n      /\\bmkfs\\b/, /\\bdd\\s+if=/, />\\s*\\/dev\\/(sd[a-z]|nvme|hd[a-z])\\b/,\n      /:\\(\\)\\s*\\{.*\\}\\s*;/,\n      /bash\\s+-i\\s+>&/, /\\/dev\\/tcp\\//,\n      /\\bnc(at)?\\b[^|;&]*\\s-e\\b/,\n      /\\|\\s*(ba|z|da|k)?sh\\b/,\n      /chmod\\s+777\\s+\\//, /\\bchown\\b[^;&]*\\s+\\//,\n      /[>]{1,2}\\s*\\/etc\\/(shadow|sudoers|passwd)\\b/, /\\bvisudo\\b/, /\\bchpasswd\\b/,\n      /(?<!\\/)\\bpasswd\\b/, /\\buseradd\\b/, /\\badduser\\b/, /\\busermod\\b/,\n      /\\bssh-keygen\\b/, /authorized_keys/,\n      /\\bcrontab\\b(?!\\s+-l\\b)/, /\\/etc\\/rc\\.local/, /systemctl\\s+enable/,\n      /\\bshutdown\\b/, /\\breboot\\b/, /\\bhalt\\b/, /\\binit\\s+[06]\\b/\n    ]\n  },\n  {\n    base: 0.70, step: 0.04, cap: 0.84,\n    patterns: [\n      /\\bwget\\b/, /\\bcurl\\b/, /\\bscp\\b/, /\\btftp\\b/,\n      /\\bapt(-get)?\\s+install\\b/, /\\byum\\s+install\\b/, /\\bdnf\\s+install\\b/,\n      /\\bpacman\\s+-[su]\\b/, /\\bpip3?\\s+install\\b/, /\\bapk\\s+add\\b/,\n      /\\bnc(at)?\\b/, /\\bnetcat\\b/,\n      /\\bkill(all)?\\b/, /\\bpkill\\b/,\n      /\\b(cat|less|more|head|tail|strings)\\s+\\/etc\\//, /\\/etc\\/passwd/, /\\/etc\\/shadow\\b/, /\\/etc\\/sudoers\\b/,\n      /\\bhistory\\s+-c\\b/, /unset\\s+histfile/, /\\bshred\\b/, /\\bwipe\\b/,\n      /\\bgcc\\b/, /\\bmake\\b/\n    ]\n  },\n  {\n    base: 0.40, step: 0.03, cap: 0.60,\n    patterns: [\n      /\\bwhoami\\b/, /\\bid\\b/, /\\buname\\b/, /\\bhostname\\b/, /\\buptime\\b/,\n      /\\bps\\b/, /\\bls\\b/, /\\bpwd\\b/, /\\benv\\b/, /\\bprintenv\\b/,\n      /\\bcat\\b/, /\\bfind\\b/, /\\bgrep\\b/, /\\bdiff\\b/, /\\bfile\\b/,\n      /\\bnmap\\b/, /\\bping\\b/, /\\bnslookup\\b/, /\\bdig\\b/, /\\btraceroute\\b/,\n      /\\bnetstat\\b/, /\\bss\\b/, /\\barp\\b/, /\\broute\\b/, /\\bifconfig\\b/, /\\bip\\s+addr\\b/,\n      /\\becho\\b/, /\\bprintf\\b/, /\\bsleep\\b/, /\\bcd\\b/, /\\bmkdir\\b/, /\\btouch\\b/\n    ]\n  }\n];\n\nfunction commandRiskScore(rawCommand) {\n  const cmd = String(rawCommand || '').toLowerCase();\n  if (!cmd.trim()) return 0;\n  let best = 0;\n  for (const tier of COMMAND_TIERS) {\n    let hits = 0;\n    for (const re of tier.patterns) {\n      if (re.test(cmd)) hits += 1;\n    }\n    if (hits > 0) {\n      const tierScore = Math.min(tier.base + (hits - 1) * tier.step, tier.cap);\n      if (tierScore > best) best = tierScore;\n    }\n  }\n  return best;\n}\n\n// El puntaje del comando es la base (garantiza el piso del tier);\n// el enriquecimiento externo suma encima, con techo 1.0.\nlet score = commandRiskScore(base.commands);\n\n// Score por detecciones en VirusTotal\nconst vtDetections = vtData.attributes?.last_analysis_stats?.malicious || 0;\nif (vtDetections > 5) score += 0.4;\nif (vtDetections > 10) score += 0.2;\n\n// Score por dominio reciente (< 30 dias)\nconst domainAge = whoisData.created_date || '';\nlet domainAgeDays = 'N/A';\nif (domainAge) {\n  const created = new Date(domainAge);\n  const daysOld = (new Date() - created) / (1000 * 60 * 60 * 24);\n  domainAgeDays = daysOld.toFixed(0);\n  if (daysOld < 30) score += 0.3;\n}\n\n// Score por multiples URLs\nif ((base.extracted_urls || []).length > 2) score += 0.2;\n\nscore = Math.min(Number(score.toFixed(2)), 1);\n\nconst tier = score >= 0.85 ? 'critical' : (score >= 0.66 ? 'high' : (score >= 0.33 ? 'medium' : 'low'));\nconst prevEnrichment = (base.enrichment_data && typeof base.enrichment_data === 'object' && !Array.isArray(base.enrichment_data)) ? base.enrichment_data : {};\nconst enrichmentTimestamp = new Date().toISOString();\n\nreturn [{\n  json: {\n    ...base,\n    risk_score: score,\n    command_risk_tier: tier,\n    // El UPDATE de PostgreSQL Auditoria persiste este objeto como jsonb:\n    // command_risk_tier debe viajar aqui para llegar a honeypot_events.\n    enrichment_data: {\n      ...prevEnrichment,\n      command_risk_tier: tier,\n      vt_detections: vtDetections,\n      domain_age_days: domainAgeDays,\n      enrichment_timestamp: enrichmentTimestamp\n    },\n    vt_detections: vtDetections,\n    domain_age_days: domainAgeDays,\n    enrichment_timestamp: enrichmentTimestamp\n  }\n}];"
+        "jsCode": "// Calcular score de riesgo para comandos (grupo 13: tabla de tiers)\n// Referencias a nodos de enriquecimiento (VirusTotal/WHOIS) con fallback\n// base: evento limpio desde Extraer IOCs (robusto aunque el enriquecimiento falle)\nconst baseItems = $('Extraer IOCs').all() || [];\nconst base = (baseItems[0] && baseItems[0].json) ? baseItems[0].json : (($input.all()[0] && $input.all()[0].json) || {});\nlet vtItems = [];\ntry { vtItems = $('VirusTotal Lookup').all() || []; } catch (e) { vtItems = []; }\nlet whoisItems = [];\ntry { whoisItems = $('WHOIS Domain').all() || []; } catch (e) { whoisItems = []; }\n\nconst vtData = (vtItems[0] && vtItems[0].json && vtItems[0].json.data) || {};\nconst whoisData = (whoisItems[0] && whoisItems[0].json) || {};\n\n// ---------------------------------------------------------------------------\n// Tabla de tiers de riesgo por contenido del comando (grupo 13)\n// CRITICAL (base 0.85): destruccion de datos (rm -rf, mkfs, dd), shell inversa\n//   (bash -i >& | /dev/tcp | nc -e), pipe-a-shell (wget/curl | sh),\n//   escalada/persistencia (passwd, useradd, ssh-keygen, crontab) y apagado.\n// HIGH (base 0.70): descargas (wget/curl/scp), instalacion de paquetes,\n//   netcat, kill de procesos, lectura de archivos sensibles (/etc/*) y\n//   anti-forense (history -c, shred).\n// MEDIUM (base 0.40): enumeracion y reconocimiento benigno (whoami, id, ls...).\n// Sin match -> 0 (el enriquecimiento VT/WHOIS puede sumar aparte).\n// Cada hit adicional dentro del tier suma \"step\", con techo \"cap\".\n// Los buckets de severidad de la API quedan: <0.33 low, <0.66 medium,\n// <0.85 high, >=0.85 critical.\n// ---------------------------------------------------------------------------\nconst COMMAND_TIERS = [\n  {\n    base: 0.85, step: 0.05, cap: 1.0,\n    patterns: [\n      /rm\\s+-[a-z]*r[a-z]*f/, /rm\\s+-[a-z]*f[a-z]*r/, /--no-preserve-root/,\n      /\\bmkfs\\b/, /\\bdd\\s+if=/, />\\s*\\/dev\\/(sd[a-z]|nvme|hd[a-z])\\b/,\n      /:\\(\\)\\s*\\{.*\\}\\s*;/,\n      /bash\\s+-i\\s+>&/, /\\/dev\\/tcp\\//,\n      /\\bnc(at)?\\b[^|;&]*\\s-e\\b/,\n      /\\|\\s*(ba|z|da|k)?sh\\b/,\n      /chmod\\s+777\\s+\\//, /\\bchown\\b[^;&]*\\s+\\//,\n      /[>]{1,2}\\s*\\/etc\\/(shadow|sudoers|passwd)\\b/, /\\bvisudo\\b/, /\\bchpasswd\\b/,\n      /(?<!\\/)\\bpasswd\\b/, /\\buseradd\\b/, /\\badduser\\b/, /\\busermod\\b/,\n      /\\bssh-keygen\\b/, /authorized_keys/,\n      /\\bcrontab\\b(?!\\s+-l\\b)/, /\\/etc\\/rc\\.local/, /systemctl\\s+enable/,\n      /\\bshutdown\\b/, /\\breboot\\b/, /\\bhalt\\b/, /\\binit\\s+[06]\\b/\n    ]\n  },\n  {\n    base: 0.70, step: 0.04, cap: 0.84,\n    patterns: [\n      /\\bwget\\b/, /\\bcurl\\b/, /\\bscp\\b/, /\\btftp\\b/,\n      /\\bapt(-get)?\\s+install\\b/, /\\byum\\s+install\\b/, /\\bdnf\\s+install\\b/,\n      /\\bpacman\\s+-[su]\\b/, /\\bpip3?\\s+install\\b/, /\\bapk\\s+add\\b/,\n      /\\bnc(at)?\\b/, /\\bnetcat\\b/,\n      /\\bkill(all)?\\b/, /\\bpkill\\b/,\n      /\\b(cat|less|more|head|tail|strings)\\s+\\/etc\\//, /\\/etc\\/passwd/, /\\/etc\\/shadow\\b/, /\\/etc\\/sudoers\\b/,\n      /\\bhistory\\s+-c\\b/, /unset\\s+histfile/, /\\bshred\\b/, /\\bwipe\\b/,\n      /\\bgcc\\b/, /\\bmake\\b/\n    ]\n  },\n  {\n    base: 0.40, step: 0.03, cap: 0.60,\n    patterns: [\n      /\\bwhoami\\b/, /\\bid\\b/, /\\buname\\b/, /\\bhostname\\b/, /\\buptime\\b/,\n      /\\bps\\b/, /\\bls\\b/, /\\bpwd\\b/, /\\benv\\b/, /\\bprintenv\\b/,\n      /\\bcat\\b/, /\\bfind\\b/, /\\bgrep\\b/, /\\bdiff\\b/, /\\bfile\\b/,\n      /\\bnmap\\b/, /\\bping\\b/, /\\bnslookup\\b/, /\\bdig\\b/, /\\btraceroute\\b/,\n      /\\bnetstat\\b/, /\\bss\\b/, /\\barp\\b/, /\\broute\\b/, /\\bifconfig\\b/, /\\bip\\s+addr\\b/,\n      /\\becho\\b/, /\\bprintf\\b/, /\\bsleep\\b/, /\\bcd\\b/, /\\bmkdir\\b/, /\\btouch\\b/\n    ]\n  }\n];\n\nfunction commandRiskScore(rawCommand) {\n  const cmd = String(rawCommand || '').toLowerCase();\n  if (!cmd.trim()) return 0;\n  let best = 0;\n  for (const tier of COMMAND_TIERS) {\n    let hits = 0;\n    for (const re of tier.patterns) {\n      if (re.test(cmd)) hits += 1;\n    }\n    if (hits > 0) {\n      const tierScore = Math.min(tier.base + (hits - 1) * tier.step, tier.cap);\n      if (tierScore > best) best = tierScore;\n    }\n  }\n  return best;\n}\n\n// El puntaje del comando es la base (garantiza el piso del tier);\n// el enriquecimiento externo suma encima, con techo 1.0.\nlet score = commandRiskScore(base.commands);\n\n// Score por detecciones en VirusTotal\nconst vtDetections = vtData.attributes?.last_analysis_stats?.malicious || 0;\nif (vtDetections > 5) score += 0.4;\nif (vtDetections > 10) score += 0.2;\n\n// Score por dominio reciente (< 30 dias)\nconst domainAge = whoisData.created_date || '';\nlet domainAgeDays = 'N/A';\nif (domainAge) {\n  const created = new Date(domainAge);\n  const daysOld = (new Date() - created) / (1000 * 60 * 60 * 24);\n  domainAgeDays = daysOld.toFixed(0);\n  if (daysOld < 30) score += 0.3;\n}\n\n// Score por multiples URLs\nif ((base.extracted_urls || []).length > 2) score += 0.2;\n\nscore = Math.min(Number(score.toFixed(2)), 1);\n\nconst tier = score >= 0.85 ? 'critical' : (score >= 0.66 ? 'high' : (score >= 0.33 ? 'medium' : 'low'));\nconst prevEnrichment = (base.enrichment_data && typeof base.enrichment_data === 'object' && !Array.isArray(base.enrichment_data)) ? base.enrichment_data : {};\nconst enrichmentTimestamp = new Date().toISOString();\n\nreturn [{\n  json: {\n    ...base,\n    risk_score: score,\n    command_risk_tier: tier,\n    // El UPDATE de PostgreSQL Auditoria persiste este objeto como jsonb:\n    // command_risk_tier debe viajar aqui para llegar a honeypot_events.\n    enrichment_data: {\n      ...prevEnrichment,\n      command_risk_tier: tier,\n      vt_detections: vtDetections,\n      domain_age_days: domainAgeDays,\n      enrichment_timestamp: enrichmentTimestamp\n    },\n    vt_detections: vtDetections,\n    domain_age_days: domainAgeDays,\n    enrichment_timestamp: enrichmentTimestamp\n  }\n}];"
       },
       "id": "function-scoring-h2",
       "name": "Calcular Risk Score",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1050,
+        1450,
         300
       ],
       "onError": "continueRegularOutput"
@@ -297,7 +339,8 @@
           "id": "postgres-cred-001",
           "name": "PostgreSQL_Audit"
         }
-      }
+      },
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -320,7 +363,8 @@
           "id": "postgres-cred-001",
           "name": "PostgreSQL_Audit"
         }
-      }
+      },
+      "onError": "continueRegularOutput"
     }
   ],
   "connections": {
@@ -339,7 +383,7 @@
       "main": [
         [
           {
-            "node": "VirusTotal Lookup",
+            "node": "¿Hay Dominios?",
             "type": "main",
             "index": 0
           }
@@ -439,6 +483,35 @@
         [
           {
             "node": "PostgreSQL Respuestas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Hay Dominios?": {
+      "main": [
+        [
+          {
+            "node": "Dividir Dominios",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Calcular Risk Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dividir Dominios": {
+      "main": [
+        [
+          {
+            "node": "VirusTotal Lookup",
             "type": "main",
             "index": 0
           }

@@ -30,6 +30,7 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2,
       "position": [450, 300],
+      "onError": "continueRegularOutput",
       "credentials": {
         "postgres": {
           "id": "postgres-cred-001",
