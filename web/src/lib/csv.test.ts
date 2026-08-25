@@ -114,7 +114,7 @@ describe('eventToCsvRow', () => {
         malware_hash: null,
       }),
     );
-    expect(row.filter((value) => value === '')).toHaveLength(7);
+    expect(row.filter((value) => value === '')).toHaveLength(12);
   });
 
   it('preserva risk_score 0 (no lo trata como vacio)', () => {

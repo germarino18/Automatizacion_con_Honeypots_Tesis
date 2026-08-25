@@ -25,6 +25,11 @@ export const EVENT_CSV_HEADERS = [
   'risk_score',
   'severidad',
   'malware_hash',
+  'abuseipdb_confidence',
+  'abuseipdb_country',
+  'shodan_org',
+  'vt_detections',
+  'domain_age_days',
 ] as const;
 
 const NEEDS_QUOTING = /[;"\r\n]/;
@@ -44,6 +49,10 @@ function toCsvString(
 
 /** Columnas del export en el orden definido por EVENT_CSV_HEADERS. */
 export function eventToCsvRow(event: EventItem): string[] {
+  const ed = (event.enrichment_data as Record<string, any>) || {};
+  const abuse = (ed.abuseipdb as Record<string, any>) || {};
+  const shodan = (ed.shodan as Record<string, any>) || {};
+
   return [
     toCsvString(event.id),
     formatTimestamp(event.timestamp),
@@ -57,6 +66,11 @@ export function eventToCsvRow(event: EventItem): string[] {
     toCsvString(event.risk_score),
     toCsvString(event.severity),
     toCsvString(event.malware_hash),
+    toCsvString(abuse.abuse_confidence ?? abuse.abuseConfidenceScore ?? ed.abuse_confidence),
+    toCsvString(abuse.country ?? ed.abuseipdb_country),
+    toCsvString(shodan.org ?? ed.shodan_org),
+    toCsvString(ed.vt_detections ?? ed.vt ?? ''),
+    toCsvString(ed.domain_age_days ?? ed.whois_domain_age_days ?? ''),
   ];
 }
 
