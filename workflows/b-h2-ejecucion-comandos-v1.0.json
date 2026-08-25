@@ -75,16 +75,9 @@
     {
       "parameters": {
         "method": "GET",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
         "url": "=https://www.virustotal.com/api/v3/domains/{{ $json[\"domain\"] }}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "x-apikey",
-              "value": "={{ $credentials[\"VirusTotal_API\"][\"apiKey\"] }}"
-            }
-          ]
-        },
         "options": {}
       },
       "id": "http-virustotal",
@@ -97,7 +90,7 @@
       ],
       "credentials": {
         "httpHeaderAuth": {
-          "id": "virustotal-cred-001",
+          "id": "pvp88GzNywM5sois",
           "name": "VirusTotal_API"
         }
       },
@@ -109,6 +102,8 @@
     {
       "parameters": {
         "method": "GET",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
         "url": "https://api.whoisfreaks.com/v1.0/whois",
         "sendQuery": true,
         "queryParameters": {
@@ -116,10 +111,6 @@
             {
               "name": "domainName",
               "value": "={{ $json[\"extracted_domains\"][0] }}"
-            },
-            {
-              "name": "apiKey",
-              "value": "={{ $credentials[\"Whois_API\"][\"apiKey\"] }}"
             }
           ]
         },
@@ -135,7 +126,7 @@
       ],
       "credentials": {
         "httpQueryAuth": {
-          "id": "whois-cred-001",
+          "id": "Hk0aMavA8sk8CWIC",
           "name": "Whois_API"
         }
       },
@@ -321,7 +312,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "UPDATE honeypot_events SET risk_score = $1, enrichment_data = CAST($2 AS jsonb), playbook_id = $3 WHERE id = $4 RETURNING id AS event_id, timestamp, src_ip, commands, risk_score",
+        "query": "UPDATE honeypot_events SET risk_score = GREATEST(honeypot_events.risk_score, $1), enrichment_data = COALESCE(honeypot_events.enrichment_data, '{}'::jsonb) || CAST($2 AS jsonb), playbook_id = $3 WHERE id = $4 RETURNING id AS event_id, timestamp, src_ip, commands, risk_score",
         "options": {
           "queryReplacement": "={{ $json[\"risk_score\"] || 0 }},={{ JSON.stringify($json[\"enrichment_data\"] || {}) }},={{ $json[\"playbook_id\"] }},={{ $json[\"event_id\"] }}"
         }

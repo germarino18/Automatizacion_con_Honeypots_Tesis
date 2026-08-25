@@ -171,6 +171,8 @@ curl -b cookies.txt http://localhost/api/v1/overview
 * Automatización de playbooks
 * Integración vía Webhooks
 
+> **Enriquecimiento externo (AbuseIPDB, Shodan, VirusTotal, WhoisFreaks):** la autenticación vive exclusivamente en credenciales genéricas de n8n (`httpHeaderAuth`/`httpQueryAuth`) referenciadas por nombre/ID en los JSON versionados; las claves nunca se commitean en este repo y los nodos son fail-open (un fallo de API no interrumpe la ingesta ni la respuesta del webhook).
+
 ---
 
 ## Instalación
