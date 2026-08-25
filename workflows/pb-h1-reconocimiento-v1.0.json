@@ -286,7 +286,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO honeypot_events (timestamp, source_honeypot, src_ip, dst_port, protocol, username, commands, playbook_id, risk_score, att_ck_technique, enrichment_data, raw_data) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CAST($11 AS jsonb), CAST($12 AS jsonb)) RETURNING id AS event_id, timestamp, src_ip, dst_port, protocol, username, commands, playbook_id, att_ck_technique",
+        "query": "INSERT INTO honeypot_events (timestamp, source_honeypot, src_ip, dst_port, protocol, username, commands, playbook_id, risk_score, att_ck_technique, enrichment_data, raw_data) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CAST($11 AS jsonb), CAST($12 AS jsonb)) RETURNING id AS event_id, timestamp, src_ip, dst_port, protocol, username, commands, playbook_id, risk_score, att_ck_technique",
         "options": {
           "queryReplacement": "={{ $json[\"timestamp\"] }},={{ $json[\"source_honeypot\"] }},={{ $json[\"src_ip\"] }},={{ $json[\"dst_port\"] }},={{ $json[\"protocol\"] }},={{ $json[\"username\"] }},={{ $json[\"commands\"] }},={{ $json[\"playbook_id\"] }},={{ $json[\"risk_score\"] || 0 }},={{ $json[\"att_ck_technique\"] }},={{ $json[\"enrichment_data\"] }},={{ $json[\"raw_data\"] }}"
         }
@@ -360,6 +360,21 @@
       "position": [
         2250,
         300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Merge risk_score from Calcular Risk Score into PostgreSQL output\n// The n8n PostgreSQL node (v2) does not reliably return all RETURNING columns.\n// This node ensures risk_score flows to downstream IF nodes.\nconst pgOutput = $input.first().json;\nconst riskData = $('Calcular Risk Score').first().json;\n\nreturn [{\n  json: {\n    ...pgOutput,\n    risk_score: riskData.risk_score || 0\n  }\n}];"
+      },
+      "id": "merge-risk-score",
+      "name": "Merge Risk Score",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2150,
+        400
       ]
     }
   ],
@@ -483,6 +498,17 @@
       ]
     },
     "PostgreSQL Auditoría": {
+      "main": [
+        [
+          {
+            "node": "Merge Risk Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Risk Score": {
       "main": [
         [
           {
