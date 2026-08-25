@@ -39,7 +39,7 @@
 
 ## 6. Ritual de cierre (fin de sesión)
 
-- [ ] 6.1 Al cerrar la sesión: sincronizar progreso a engram (`mem_save` con topic_key `opsx/activacion-enriquecimiento/apply`), commit conventional sin atribución AI con los JSON rewired + evidencia, y push — solo como paso final de checklist de sesión **[PARCIAL en esta fase: engram sincronizado por el agente apply. Commit/push lo ejecuta el orquestador en el ritual de cierre — fuera del alcance apply]**
+- [x] 6.1 Al cerrar la sesión: sincronizar progreso a engram (`mem_save` con topic_key `opsx/activacion-enriquecimiento/apply`), commit conventional sin atribución AI con los JSON rewired + evidencia, y push — solo como paso final de checklist de sesión **[COMPLETADO por el orquestador en rituales de cierre: commits `d4328fe` (rewiring + persistencia) y `a4a201e` (VT/WHOIS operativos), ambos pushed a main]**
 
 ## 7. Correcciones post-verificación (hallazgos del orquestador, sesión de activación)
 
