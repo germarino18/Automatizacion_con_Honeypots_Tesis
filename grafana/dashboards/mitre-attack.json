@@ -6,37 +6,21 @@
   "schemaVersion": 39,
   "version": 1,
   "timezone": "browser",
-  "time": { "from": "now-7d", "to": "now" },
-  "templating": {
-    "list": [
-      {
-        "name": "technique",
-        "label": "Técnica ATT&CK",
-        "type": "query",
-        "datasource": { "type": "postgres", "uid": "postgres-honeypots" },
-        "query": "SELECT DISTINCT att_ck_technique FROM honeypot_events WHERE att_ck_technique IS NOT NULL ORDER BY att_ck_technique",
-        "includeAll": true,
-        "allValue": null,
-        "multi": false,
-        "refresh": 1,
-        "sort": 1,
-        "definition": "SELECT DISTINCT att_ck_technique FROM honeypot_events WHERE att_ck_technique IS NOT NULL ORDER BY att_ck_technique"
-      }
-    ]
-  },
+  "time": { "from": "now-30d", "to": "now" },
+  "templating": { "list": [] },
   "panels": [
     {
       "id": 1,
       "type": "stat",
       "title": "Eventos con técnica registrada",
       "datasource": { "type": "postgres", "uid": "postgres-honeypots" },
-      "description": "Total de eventos con técnica MITRE ATT&CK. Tolera valores NULL en att_ck_technique (se excluyen del conteo, no genera error).",
+      "description": "Total de eventos con técnica MITRE ATT&CK.",
       "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
       "targets": [
         {
           "refId": "A",
           "format": "table",
-          "rawSql": "SELECT COUNT(*) AS total FROM honeypot_events WHERE $__timeFilter(timestamp) AND att_ck_technique IS NOT NULL AND ( '$technique' = '' OR att_ck_technique = '${technique:singlequote}' )",
+          "rawSql": "SELECT COUNT(*) AS total FROM honeypot_events WHERE $__timeFilter(timestamp) AND att_ck_technique IS NOT NULL",
           "datasource": { "type": "postgres", "uid": "postgres-honeypots" }
         }
       ],
@@ -62,13 +46,13 @@
       "type": "piechart",
       "title": "Técnicas por conteo",
       "datasource": { "type": "postgres", "uid": "postgres-honeypots" },
-      "description": "Frecuencia de técnicas ATT&CK (T1595 reconocimiento, T1046 escaneo de servicios, T1190 explotación, T1059 ejecución). Los eventos sin técnica se excluyen.",
+      "description": "Frecuencia de técnicas ATT&CK.",
       "gridPos": { "h": 8, "w": 6, "x": 6, "y": 0 },
       "targets": [
         {
           "refId": "A",
           "format": "table",
-          "rawSql": "SELECT att_ck_technique, COUNT(*) AS eventos FROM honeypot_events WHERE $__timeFilter(timestamp) AND att_ck_technique IS NOT NULL AND ( '$technique' = '' OR att_ck_technique = '${technique:singlequote}' ) GROUP BY att_ck_technique ORDER BY eventos DESC",
+          "rawSql": "SELECT att_ck_technique, COUNT(*) AS eventos FROM honeypot_events WHERE $__timeFilter(timestamp) AND att_ck_technique IS NOT NULL GROUP BY att_ck_technique ORDER BY eventos DESC",
           "datasource": { "type": "postgres", "uid": "postgres-honeypots" }
         }
       ],
@@ -93,7 +77,7 @@
         {
           "refId": "A",
           "format": "table",
-          "rawSql": "SELECT timestamp, att_ck_technique, src_ip, source_honeypot, risk_score FROM honeypot_events WHERE $__timeFilter(timestamp) AND ( '$technique' = '' OR att_ck_technique = '${technique:singlequote}' ) ORDER BY timestamp DESC",
+          "rawSql": "SELECT timestamp, att_ck_technique, src_ip, source_honeypot, risk_score FROM honeypot_events WHERE $__timeFilter(timestamp) ORDER BY timestamp DESC",
           "datasource": { "type": "postgres", "uid": "postgres-honeypots" }
         }
       ],

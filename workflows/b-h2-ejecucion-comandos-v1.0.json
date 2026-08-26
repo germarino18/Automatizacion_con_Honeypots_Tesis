@@ -316,9 +316,9 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "UPDATE honeypot_events SET risk_score = GREATEST(honeypot_events.risk_score, $1), enrichment_data = COALESCE(honeypot_events.enrichment_data, '{}'::jsonb) || CAST($2 AS jsonb), playbook_id = $3 WHERE id = $4 RETURNING id AS event_id, timestamp, src_ip, commands, risk_score",
+        "query": "UPDATE honeypot_events SET risk_score = GREATEST(honeypot_events.risk_score, $1), enrichment_data = COALESCE(honeypot_events.enrichment_data, '{}'::jsonb) || CAST($2 AS jsonb), playbook_id = $3, att_ck_technique = $5 WHERE id = $4 RETURNING id AS event_id, timestamp, src_ip, commands, risk_score, att_ck_technique",
         "options": {
-          "queryReplacement": "={{ $json[\"risk_score\"] || 0 }},={{ JSON.stringify($json[\"enrichment_data\"] || {}) }},={{ $json[\"playbook_id\"] }},={{ $json[\"event_id\"] }}"
+          "queryReplacement": "={{ $json[\"risk_score\"] || 0 }},={{ JSON.stringify($json[\"enrichment_data\"] || {}) }},={{ $json[\"playbook_id\"] }},={{ $json[\"event_id\"] }},={{ $json[\"att_ck_technique\"] }}"
         }
       },
       "id": "postgres-audit-h2",

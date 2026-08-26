@@ -220,6 +220,8 @@ services:
     build:
       context: ./web
     container_name: soc-web
+    ports:
+      - "3002:80"
     networks:
       - red_interna
     depends_on:

@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS honeypot_events (
     att_ck_technique VARCHAR(20),                 -- Técnica MITRE ATT&CK
     enrichment_data JSONB,                        -- Datos enriquecidos (VirusTotal, AbuseIPDB, etc.)
     raw_data JSONB,                               -- Datos crudos del webhook
+    received_at TIMESTAMP WITH TIME ZONE,            -- Hora en que el webhook recibe el evento (no el timestamp del payload)
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 

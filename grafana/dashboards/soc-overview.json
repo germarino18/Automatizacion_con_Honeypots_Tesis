@@ -1,332 +1,107 @@
 {
   "uid": "soc-overview",
   "title": "SOC Overview",
-  "tags": [
-    "honeypot"
-  ],
+  "tags": ["honeypot"],
   "refresh": "30s",
   "schemaVersion": 39,
   "version": 1,
   "timezone": "browser",
-  "time": {
-    "from": "now-7d",
-    "to": "now"
-  },
-  "templating": {
-    "list": [
-      {
-        "name": "honeypot",
-        "label": "Honeypot",
-        "type": "query",
-        "datasource": {
-          "type": "postgres",
-          "uid": "postgres-honeypots"
-        },
-        "query": "SELECT DISTINCT source_honeypot FROM honeypot_events ORDER BY source_honeypot",
-        "includeAll": true,
-        "allValue": null,
-        "multi": true,
-        "refresh": 1,
-        "sort": 1,
-        "definition": "SELECT DISTINCT source_honeypot FROM honeypot_events ORDER BY source_honeypot"
-      },
-      {
-        "name": "protocol",
-        "label": "Protocolo",
-        "type": "query",
-        "datasource": {
-          "type": "postgres",
-          "uid": "postgres-honeypots"
-        },
-        "query": "SELECT DISTINCT protocol FROM honeypot_events WHERE protocol IS NOT NULL ORDER BY protocol",
-        "includeAll": true,
-        "allValue": null,
-        "multi": true,
-        "refresh": 1,
-        "sort": 1,
-        "definition": "SELECT DISTINCT protocol FROM honeypot_events WHERE protocol IS NOT NULL ORDER BY protocol"
-      }
-    ]
-  },
+  "time": { "from": "now-30d", "to": "now" },
+  "templating": { "list": [] },
   "panels": [
     {
       "id": 1,
       "type": "stat",
       "title": "Total de eventos",
-      "datasource": {
-        "type": "postgres",
-        "uid": "postgres-honeypots"
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 0,
-        "y": 0
-      },
+      "datasource": { "type": "postgres", "uid": "postgres-honeypots" },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
       "targets": [
         {
           "refId": "A",
           "format": "table",
-          "rawSql": "SELECT COUNT(*) AS total FROM honeypot_events WHERE $__timeFilter(timestamp) AND source_honeypot IN (${honeypot:sqlstring}) AND protocol IN (${protocol:sqlstring})",
-          "datasource": {
-            "type": "postgres",
-            "uid": "postgres-honeypots"
-          }
+          "rawSql": "SELECT COUNT(*) AS total FROM honeypot_events WHERE $__timeFilter(timestamp)",
+          "datasource": { "type": "postgres", "uid": "postgres-honeypots" }
         }
       ],
       "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "blue",
-                "value": null
-              }
-            ]
-          },
-          "unit": "none"
-        },
+        "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] }, "unit": "none" },
         "overrides": []
       },
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      }
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" }
     },
     {
       "id": 2,
       "type": "piechart",
       "title": "Eventos por honeypot",
-      "datasource": {
-        "type": "postgres",
-        "uid": "postgres-honeypots"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 6,
-        "x": 6,
-        "y": 0
-      },
+      "datasource": { "type": "postgres", "uid": "postgres-honeypots" },
+      "gridPos": { "h": 8, "w": 6, "x": 6, "y": 0 },
       "targets": [
         {
           "refId": "A",
           "format": "table",
-          "rawSql": "SELECT source_honeypot, COUNT(*) AS eventos FROM honeypot_events WHERE $__timeFilter(timestamp) AND source_honeypot IN (${honeypot:sqlstring}) AND protocol IN (${protocol:sqlstring}) GROUP BY source_honeypot ORDER BY eventos DESC",
-          "datasource": {
-            "type": "postgres",
-            "uid": "postgres-honeypots"
-          }
+          "rawSql": "SELECT source_honeypot, COUNT(*) AS eventos FROM honeypot_events WHERE $__timeFilter(timestamp) GROUP BY source_honeypot ORDER BY eventos DESC",
+          "datasource": { "type": "postgres", "uid": "postgres-honeypots" }
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "unit": "none"
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "pieType": "pie",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      }
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "unit": "none" }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "pieType": "pie", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "tooltip": { "mode": "single", "sort": "none" } }
     },
     {
       "id": 3,
       "type": "timeseries",
       "title": "Eventos en el tiempo",
-      "datasource": {
-        "type": "postgres",
-        "uid": "postgres-honeypots"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 4
-      },
+      "datasource": { "type": "postgres", "uid": "postgres-honeypots" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
       "targets": [
         {
           "refId": "A",
           "format": "time_series",
-          "rawSql": "SELECT $__timeGroupAlias(timestamp,1h), COUNT(*) AS eventos FROM honeypot_events WHERE $__timeFilter(timestamp) AND source_honeypot IN (${honeypot:sqlstring}) AND protocol IN (${protocol:sqlstring}) GROUP BY 1 ORDER BY 1",
-          "datasource": {
-            "type": "postgres",
-            "uid": "postgres-honeypots"
-          }
+          "rawSql": "SELECT $__timeGroupAlias(timestamp,1h), COUNT(*) AS eventos FROM honeypot_events WHERE $__timeFilter(timestamp) GROUP BY 1 ORDER BY 1",
+          "datasource": { "type": "postgres", "uid": "postgres-honeypots" }
         }
       ],
       "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 20,
-            "lineWidth": 1,
-            "showPoints": "never",
-            "spanNulls": true
-          },
-          "unit": "none"
-        },
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "fillOpacity": 20, "lineWidth": 1, "showPoints": "never", "spanNulls": true }, "unit": "none" },
         "overrides": []
       },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } }
     },
     {
       "id": 4,
       "type": "bargauge",
       "title": "Top src_ip",
-      "datasource": {
-        "type": "postgres",
-        "uid": "postgres-honeypots"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 4
-      },
+      "datasource": { "type": "postgres", "uid": "postgres-honeypots" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
       "targets": [
         {
           "refId": "A",
           "format": "table",
-          "rawSql": "SELECT src_ip, COUNT(*) AS intentos FROM honeypot_events WHERE $__timeFilter(timestamp) AND source_honeypot IN (${honeypot:sqlstring}) AND protocol IN (${protocol:sqlstring}) GROUP BY src_ip ORDER BY intentos DESC LIMIT 10",
-          "datasource": {
-            "type": "postgres",
-            "uid": "postgres-honeypots"
-          }
+          "rawSql": "SELECT src_ip, COUNT(*) AS intentos FROM honeypot_events WHERE $__timeFilter(timestamp) GROUP BY src_ip ORDER BY intentos DESC LIMIT 10",
+          "datasource": { "type": "postgres", "uid": "postgres-honeypots" }
         }
       ],
       "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "blue",
-                "value": null
-              }
-            ]
-          },
-          "unit": "none"
-        },
+        "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] }, "unit": "none" },
         "overrides": []
       },
-      "options": {
-        "displayMode": "gradient",
-        "orientation": "horizontal",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showUnfilled": true,
-        "text": {
-          "titleSize": 12,
-          "valueSize": 12
-        }
-      }
+      "options": { "displayMode": "gradient", "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "showUnfilled": true, "text": { "titleSize": 12, "valueSize": 12 } }
     },
     {
       "id": 5,
       "type": "piechart",
       "title": "Distribución de riesgo",
-      "datasource": {
-        "type": "postgres",
-        "uid": "postgres-honeypots"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 6,
-        "x": 0,
-        "y": 12
-      },
+      "datasource": { "type": "postgres", "uid": "postgres-honeypots" },
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 12 },
       "targets": [
         {
           "refId": "A",
           "format": "table",
-          "rawSql": "SELECT risk_score, COUNT(*) AS eventos FROM honeypot_events WHERE $__timeFilter(timestamp) AND source_honeypot IN (${honeypot:sqlstring}) AND protocol IN (${protocol:sqlstring}) GROUP BY risk_score ORDER BY risk_score",
-          "datasource": {
-            "type": "postgres",
-            "uid": "postgres-honeypots"
-          }
+          "rawSql": "SELECT risk_score, COUNT(*) AS eventos FROM honeypot_events WHERE $__timeFilter(timestamp) GROUP BY risk_score ORDER BY risk_score",
+          "datasource": { "type": "postgres", "uid": "postgres-honeypots" }
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "unit": "none"
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "pieType": "pie",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      }
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "unit": "none" }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "pieType": "pie", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "tooltip": { "mode": "single", "sort": "none" } }
     }
   ]
 }
