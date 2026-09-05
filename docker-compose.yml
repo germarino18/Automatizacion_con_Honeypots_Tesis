@@ -41,6 +41,11 @@ services:
       - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD}
       - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
       - WEBHOOK_URL=${WEBHOOK_URL}
+      # Tokens GLPI (workflow webhook-glpi-ticket; referenciados por {{ $env.* }})
+      - GLPI_APP_TOKEN=${GLPI_APP_TOKEN}
+      - GLPI_USER_TOKEN=${GLPI_USER_TOKEN}
+      # Permite `{{ $env.* }}` en expresiones de nodos (requerido por D-glpi-3)
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
       # Base de datos (PostgreSQL como backend)
       - DB_TYPE=postgresdb
       - DB_POSTGRESDB_HOST=postgres
@@ -228,6 +233,67 @@ services:
       api:
         condition: service_healthy
     restart: unless-stopped
+
+  # -------------------------------------------
+  # 10. GLPI DB (MySQL dedicado - GLPI no soporta PostgreSQL)
+  # -------------------------------------------
+  glpi-db:
+    image: mysql:8.4
+    container_name: soc-glpi-db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${GLPI_DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${GLPI_DB_NAME}
+      MYSQL_USER: ${GLPI_DB_USER}
+      MYSQL_PASSWORD: ${GLPI_DB_PASSWORD}
+    volumes:
+      - glpi_db_data:/var/lib/mysql
+    networks:
+      - red_interna
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # -------------------------------------------
+  # 11. GLPI (ITSM - Service Desk, integración n8n)
+  # -------------------------------------------
+  glpi:
+    image: glpi/glpi:11.0.8
+    container_name: soc-glpi
+    environment:
+      GLPI_DB_HOST: ${GLPI_DB_HOST}
+      GLPI_DB_PORT: ${GLPI_DB_PORT}
+      GLPI_DB_NAME: ${GLPI_DB_NAME}
+      GLPI_DB_USER: ${GLPI_DB_USER}
+      GLPI_DB_PASSWORD: ${GLPI_DB_PASSWORD}
+      GLPI_APP_TOKEN: ${GLPI_APP_TOKEN}
+      GLPI_USER_TOKEN: ${GLPI_USER_TOKEN}
+    volumes:
+      - glpi_data:/var/glpi
+    ports:
+      - "127.0.0.1:${GLPI_PORT:-8080}:80"
+    networks:
+      - red_interna
+    depends_on:
+      glpi-db:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS -o /dev/null http://localhost/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+
+# ===========================================
+# VOLÚMENES
+# ===========================================
+volumes:
+  glpi_data:
+  glpi_db_data:
 
 # ===========================================
 # REDES

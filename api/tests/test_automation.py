@@ -343,7 +343,13 @@ async def test_create_ticket_ok(auth_client, monkeypatch):
         }
         return httpx.Response(
             200,
-            json={"success": True, "message": "Ticket created", "action_id": 3},
+            json={
+                "success": True,
+                "message": "Ticket GLPI #3 creado",
+                "action_id": 3,
+                "glpi_ticket_id": 3,
+                "timestamp": "2026-09-05T10:00:00.000Z",
+            },
         )
 
     _patch_n8n(monkeypatch, handler)
@@ -356,6 +362,34 @@ async def test_create_ticket_ok(auth_client, monkeypatch):
     body = CreateTicketResponse.model_validate(resp.json())
     assert body.success is True
     assert body.result["action_id"] == 3
+    assert body.result["glpi_ticket_id"] == 3
+
+
+@pytest.mark.asyncio
+async def test_create_ticket_ok_without_glpi_ticket_id_still_ok(auth_client, monkeypatch):
+    """If the workflow response omits glpi_ticket_id (pre-GLPI simulated
+    contract) the endpoint still returns 200: the id is optional for success."""
+    def handler(request):
+        assert request.method == "POST"
+        assert request.url.path == "/webhook/glpi-ticket"
+        assert json.loads(request.content) == {
+            "event_id": None,
+            "name": "Alerta",
+            "content": "prueba",
+            "urgency": "medium",
+        }
+        return httpx.Response(200, json={"success": True, "message": "ok", "action_id": 4})
+
+    _patch_n8n(monkeypatch, handler)
+    resp = await auth_client.post(
+        "/api/v1/automation/create-ticket",
+        json={"event_id": None, "name": "Alerta", "content": "prueba", "urgency": "medium"},
+    )
+
+    assert resp.status_code == 200
+    body = CreateTicketResponse.model_validate(resp.json())
+    assert body.success is True
+    assert "glpi_ticket_id" not in body.result
 
 
 @pytest.mark.asyncio
@@ -395,7 +429,9 @@ async def test_create_ticket_blank_content_422(auth_client, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_create_ticket_n8n_down_returns_502_503(auth_client, monkeypatch):
+async def test_create_ticket_n8n_down_returns_503(auth_client, monkeypatch):
+    """n8n unreachable (connection error) -> N8nClientError with no
+    status_code -> HTTP 503, without reporting a false success."""
     def handler(request):
         raise httpx.ConnectError("n8n unreachable")
 
@@ -405,7 +441,53 @@ async def test_create_ticket_n8n_down_returns_502_503(auth_client, monkeypatch):
         json={"event_id": None, "name": "Alerta", "content": "prueba", "urgency": "high"},
     )
 
-    assert resp.status_code in (502, 503)
+    assert resp.status_code == 503
+    assert "success" not in resp.json()
+
+
+@pytest.mark.asyncio
+async def test_create_ticket_webhook_http_error_returns_502(auth_client, monkeypatch):
+    """n8n answers with an HTTP error status -> N8nClientError with
+    status_code -> HTTP 502, never a false success."""
+    def handler(request):
+        return httpx.Response(500, json={"message": "workflow boom"})
+
+    _patch_n8n(monkeypatch, handler)
+    resp = await auth_client.post(
+        "/api/v1/automation/create-ticket",
+        json={"event_id": None, "name": "Alerta", "content": "prueba", "urgency": "high"},
+    )
+
+    assert resp.status_code == 502
+    assert "success" not in resp.json()
+
+
+@pytest.mark.asyncio
+async def test_create_ticket_workflow_failure_no_false_success(auth_client, monkeypatch):
+    """GLPI down/rejected: the workflow answers 200 with success:false and
+    glpi_ticket_id null -> the endpoint rejects with 502 (D-glpi-7) and no
+    success flag leaks into the response body."""
+    def handler(request):
+        return httpx.Response(
+            200,
+            json={
+                "success": False,
+                "message": "GLPI no disponible",
+                "action_id": None,
+                "glpi_ticket_id": None,
+                "timestamp": "2026-09-05T10:00:00.000Z",
+            },
+        )
+
+    _patch_n8n(monkeypatch, handler)
+    resp = await auth_client.post(
+        "/api/v1/automation/create-ticket",
+        json={"event_id": None, "name": "Alerta", "content": "prueba", "urgency": "high"},
+    )
+
+    assert resp.status_code == 502
+    assert resp.json()["detail"] == "n8n no reportó éxito"
+    assert "success" not in resp.json()
 
 
 @pytest.mark.asyncio

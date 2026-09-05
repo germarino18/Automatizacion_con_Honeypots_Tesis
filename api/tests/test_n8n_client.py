@@ -287,6 +287,130 @@ async def test_create_ticket_payload():
     assert result["action_id"] == 3
 
 
+@pytest.mark.asyncio
+async def test_create_ticket_passes_glpi_ticket_id_through():
+    """The reworked workflow answers {success, message, action_id,
+    glpi_ticket_id, timestamp} when GLPI created the ticket; the client is
+    transparent so the router can echo glpi_ticket_id inside result."""
+    async def handler(request):
+        assert request.url.path == "/webhook/glpi-ticket"
+        assert request.method == "POST"
+        body = json.loads(request.content)
+        assert body == {
+            "event_id": 9,
+            "name": "Ticket SOC",
+            "content": "detalle del incidente",
+            "urgency": "high",
+        }
+        return httpx.Response(
+            200,
+            json={
+                "success": True,
+                "message": "Ticket GLPI #42 creado",
+                "action_id": "exec-9",
+                "glpi_ticket_id": 42,
+                "timestamp": "2026-09-05T10:00:00.000Z",
+            },
+        )
+
+    result = await n8n_client.create_ticket(
+        event_id=9,
+        name="Ticket SOC",
+        content="detalle del incidente",
+        urgency="high",
+        client=_client(handler),
+    )
+
+    assert result["success"] is True
+    assert result["glpi_ticket_id"] == 42
+    assert result["action_id"] == "exec-9"
+    assert result["timestamp"] == "2026-09-05T10:00:00.000Z"
+
+
+@pytest.mark.asyncio
+async def test_create_ticket_event_id_null_payload_verbatim():
+    """event_id is nullable (id|null) and the contract payload still goes
+    VERBATIM to /webhook/glpi-ticket."""
+    async def handler(request):
+        assert request.url.path == "/webhook/glpi-ticket"
+        assert json.loads(request.content) == {
+            "event_id": None,
+            "name": "Alerta",
+            "content": "cuerpo",
+            "urgency": "low",
+        }
+        return httpx.Response(
+            200,
+            json={"success": True, "glpi_ticket_id": 7},
+        )
+
+    result = await n8n_client.create_ticket(
+        event_id=None,
+        name="Alerta",
+        content="cuerpo",
+        urgency="low",
+        client=_client(handler),
+    )
+
+    assert result["glpi_ticket_id"] == 7
+
+
+@pytest.mark.asyncio
+async def test_create_ticket_via_built_webhook_client_never_sends_api_key(monkeypatch):
+    """Webhook actions must never carry the public-API key (sidecar
+    precedent). create_ticket through a real build_client(webhook=True)
+    run for the request."""
+    async def handler(request):
+        assert "X-N8N-API-KEY" not in request.headers
+        return httpx.Response(200, json={"success": True, "glpi_ticket_id": 15})
+
+    monkeypatch.setattr(
+        n8n_client,
+        "build_client",
+        partial(
+            n8n_client.build_client,
+            transport=httpx.MockTransport(handler),
+            webhook=True,
+        ),
+    )
+    result = await n8n_client.create_ticket(
+        event_id=1, name="N", content="C", urgency="medium"
+    )
+
+    assert result["glpi_ticket_id"] == 15
+
+
+@pytest.mark.asyncio
+async def test_create_ticket_keeps_failure_body_for_router_enforcement():
+    """When GLPI rejects the ticket the workflow answers 200 with
+    success:false + glpi_ticket_id null; to avoid a false success the client
+    must pass the body untouched so the router's _ensure_success can reject
+    it (D-glpi-6/D-glpi-7)."""
+    async def handler(request):
+        assert request.url.path == "/webhook/glpi-ticket"
+        return httpx.Response(
+            200,
+            json={
+                "success": False,
+                "message": "GLPI rechazó el ticket",
+                "action_id": None,
+                "glpi_ticket_id": None,
+                "timestamp": "2026-09-05T10:00:00.000Z",
+            },
+        )
+
+    result = await n8n_client.create_ticket(
+        event_id=2,
+        name="N",
+        content="C",
+        urgency="medium",
+        client=_client(handler),
+    )
+
+    assert result["success"] is False
+    assert result["glpi_ticket_id"] is None
+
+
 # --- 6.2: error capture -----------------------------------------------------
 
 

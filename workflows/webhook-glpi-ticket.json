@@ -18,17 +18,179 @@
     },
     {
       "parameters": {
+        "method": "POST",
+        "url": "http://glpi/apirest.php/initSession",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "App-Token",
+              "value": "={{ $env.GLPI_APP_TOKEN }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=user_token {{ $env.GLPI_USER_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{}",
+        "options": {}
+      },
+      "id": "http-init-session",
+      "name": "Init Session",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [450, 300],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ !!$json.session_token }}",
+              "operation": "equal",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "if-session-ok",
+      "name": "Session Iniciada?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://glpi/apirest.php/Ticket",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "App-Token",
+              "value": "={{ $env.GLPI_APP_TOKEN }}"
+            },
+            {
+              "name": "Session-Token",
+              "value": "={{ $('Init Session').item.json.session_token }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ input: { name: $('Webhook Ticket').item.json.body.name, content: $('Webhook Ticket').item.json.body.content, urgency: ({ low: 2, medium: 3, high: 4 })[$('Webhook Ticket').item.json.body.urgency] || 3, type: 1, requesttypes_id: 1, impact: 3 } }) }}",
+        "options": {}
+      },
+      "id": "http-create-ticket",
+      "name": "Create Ticket",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [850, 200],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://glpi/apirest.php/killSession",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "App-Token",
+              "value": "={{ $env.GLPI_APP_TOKEN }}"
+            },
+            {
+              "name": "Session-Token",
+              "value": "={{ $('Init Session').item.json.session_token }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "http-kill-session",
+      "name": "Kill Session",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [1050, 200],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const input = $input.all();\n\nlet webhookJson = {};\nlet createJson = {};\n\ntry { webhookJson = $('Webhook Ticket').first().json || {}; } catch (e) { webhookJson = {}; }\ntry { createJson = $('Create Ticket').first().json || {}; } catch (e) { createJson = {}; }\n\nconst body = (webhookJson.body && typeof webhookJson.body === 'object') ? webhookJson.body : {};\n\nconst extractError = (raw) => {\n  if (raw == null) return null;\n  if (typeof raw === 'string') return raw;\n  if (typeof raw === 'object') {\n    if (raw.message) return String(raw.message);\n    if (raw.code) return String(raw.code);\n    if (typeof raw.error !== 'undefined') return extractError(raw.error);\n    try {\n      const s = JSON.stringify(raw);\n      return s && s !== '{}' ? s : null;\n    } catch (e) {\n      return null;\n    }\n  }\n  return String(raw);\n};\n\nlet ticketId = null;\nlet errorMessage = null;\n\nif (typeof createJson.id === 'number') {\n  ticketId = createJson.id;\n} else {\n  let err = extractError(createJson.error);\n  if (!err) {\n    for (const nodeName of ['Init Session', 'Kill Session']) {\n      let n = {};\n      try { n = $('' + nodeName).first().json || {}; } catch (e) { n = {}; }\n      err = extractError(n.error);\n      if (err) break;\n    }\n  }\n  errorMessage = err || 'Fallo en la creacion del ticket GLPI';\n}\n\nreturn [{\n  json: {\n    ok: ticketId !== null,\n    ticket_id: ticketId,\n    errorMessage: errorMessage,\n    event_id: body.event_id || null,\n    name: body.name,\n    content: body.content,\n    urgency: body.urgency\n  }\n}];"
+      },
+      "id": "code-normalize-state",
+      "name": "Normalizar Estado",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 300],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.ok }}",
+              "operation": "equal",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "if-ticket-created",
+      "name": "Ticket Creado?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1450, 300]
+    },
+    {
+      "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO responses (event_id, action_type, actor, status, details)\nVALUES ($1, 'alerta', 'n8n-automated', 'completed',\n  jsonb_build_object(\n    'ticket_name', $2,\n    'content', $3,\n    'urgency', $4,\n    'created_at', now()::text\n  )\n)\nRETURNING id, timestamp",
+        "query": "INSERT INTO responses (event_id, action_type, actor, status, details)\nVALUES ($1, 'alerta', 'n8n-automated', 'completed',\n  jsonb_build_object(\n    'name', $2,\n    'content', $3,\n    'urgency', $4,\n    'glpi_ticket_id', $5,\n    'created_at', now()::text\n  )\n)\nRETURNING id, timestamp",
         "options": {
-          "queryReplacement": "={{ $json.body[\"event_id\"] || null }},={{ $json.body[\"name\"] }},={{ $json.body[\"content\"] }},={{ $json.body[\"urgency\"] }}"
+          "queryReplacement": "={{ $json.event_id }},={{ $json.name }},={{ $json.content }},={{ $json.urgency }},={{ $json.ticket_id }}"
         }
       },
       "id": "crear-ticket",
       "name": "Crear Ticket",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2,
-      "position": [450, 300],
+      "position": [1700, 200],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "postgres": {
+          "id": "postgres-cred-001",
+          "name": "PostgreSQL_Audit"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO responses (event_id, action_type, actor, status, details)\nVALUES ($1, 'alerta', 'n8n-automated', 'error',\n  jsonb_build_object(\n    'name', $2,\n    'content', $3,\n    'urgency', $4,\n    'error', $5,\n    'created_at', now()::text\n  )\n)\nRETURNING id, timestamp",
+        "options": {
+          "queryReplacement": "={{ $json.event_id }},={{ $json.name }},={{ $json.content }},={{ $json.urgency }},={{ $json.errorMessage }}"
+        }
+      },
+      "id": "registrar-error-ticket",
+      "name": "Registrar Error",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1700, 420],
       "onError": "continueRegularOutput",
       "credentials": {
         "postgres": {
@@ -40,13 +202,30 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ JSON.stringify({ success: true, message: \"Ticket created\", action_id: $json.id, timestamp: $json.timestamp }) }}"
+        "responseBody": "={{ JSON.stringify({ success: true, message: \"Ticket creado en GLPI\", action_id: $json.id, glpi_ticket_id: $('Normalizar Estado').first().json.ticket_id, timestamp: $json.timestamp }) }}",
+        "options": {
+          "responseCode": 200
+        }
       },
       "id": "responder",
       "name": "Responder",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [650, 300]
+      "position": [1950, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, message: \"No se pudo crear el ticket GLPI\", action_id: $json.id, glpi_ticket_id: $('Normalizar Estado').first().json.ticket_id, timestamp: $json.timestamp }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "responder-error",
+      "name": "Responder Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1950, 420]
     }
   ],
   "connections": {
@@ -54,7 +233,87 @@
       "main": [
         [
           {
+            "node": "Init Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Init Session": {
+      "main": [
+        [
+          {
+            "node": "Session Iniciada?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Session Iniciada?": {
+      "main": [
+        [
+          {
+            "node": "Create Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Normalizar Estado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Ticket": {
+      "main": [
+        [
+          {
+            "node": "Kill Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Kill Session": {
+      "main": [
+        [
+          {
+            "node": "Normalizar Estado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar Estado": {
+      "main": [
+        [
+          {
+            "node": "Ticket Creado?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ticket Creado?": {
+      "main": [
+        [
+          {
             "node": "Crear Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Registrar Error",
             "type": "main",
             "index": 0
           }
@@ -66,6 +325,17 @@
         [
           {
             "node": "Responder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registrar Error": {
+      "main": [
+        [
+          {
+            "node": "Responder Error",
             "type": "main",
             "index": 0
           }
