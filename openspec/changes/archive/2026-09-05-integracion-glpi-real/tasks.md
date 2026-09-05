@@ -12,7 +12,7 @@
 - [x] 2.2 Habilitar la REST API (Setup → General → API): "Enable Rest API=Yes" y "Enable login with credentials=Yes".
 - [x] 2.3 Crear un cliente de API (App-Token) y copiar el valor a `GLPI_APP_TOKEN` en `.env` (D-glpi-3).
 - [x] 2.4 Crear un usuario API dedicado con perfil limitado (NO super-admin) y generar su `user_token`, copiándolo a `GLPI_USER_TOKEN` en `.env`.
-- [ ] 2.5 Configurar el servidor de correo saliente (SMTP) en GLPI (Setup → Notifications) para habilitar las notificaciones de email de los tickets (decisión del usuario; opcional si no se quiere email, la creación de ticket funciona igual).
+- [ ] 2.5 Configurar el servidor de correo saliente (SMTP) en GLPI (Setup → Notifications) para habilitar las notificaciones de email de los tickets (decisión del usuario; opcional si no se quiere email, la creación de ticket funciona igual). **DIFERIDO por decisión del usuario — queda como futura mejora.**
 - [x] 2.6 Verificar manualmente el flujo `initSession` → `POST /Ticket` → `killSession` contra `apirest.php` con los tokens (crear y borrar un ticket de prueba si aplica).
 
 ## 3. Rework del workflow n8n webhook-glpi-ticket
@@ -35,13 +35,13 @@
 
 - [x] 5.1 Crear un ticket desde la UI (`POST /api/v1/automation/create-ticket`) y confirmar que aparece un **ticket real en GLPI** (vía API/UI) con name/content y urgencia traducida correctamente (D-glpi-5).
 - [x] 5.2 Confirmar que el INSERT en `responses` registra `action_type='alerta'`, `actor='n8n-automated'`, `status='completed'` y `details.glpi_ticket_id` igual al ticket real creado.
-- [ ] 5.3 Verificar que la notificación de email se dispara (si hay SMTP configurado) al crear el ticket, y que la creación NO depende de SMTP (el workflow no falla sin él).
+- [ ] 5.3 Verificar que la notificación de email se dispara (si hay SMTP configurado) al crear el ticket, y que la creación NO depende de SMTP (el workflow no falla sin él). **DIFERIDO junto con 2.5 (SMTP no configurado).**
 - [x] 5.4 Verificar el registro de error GLPI: forzar un fallo (p. ej. token inválido o GLPI parado) y confirmar que `responses` registra el intento con `status='error'` y `details.error`, sin reportar éxito falso en la API (D-glpi-7).
 - [x] 5.5 Ejecutar las verificaciones de regresión de `diagnostico-cadena` (healthz, webhooks cowrie/dionaea/firewall-block, persistencia) y confirmar que ningún servicio existente se degradó.
 - [x] 5.6 Verificar que no hay secretos GLPI literales en el repo (grep App-Token/User-Token/passwords) y que `.env` está excluido por `.gitignore`.
 
 ## 6. Documentación y cierre del change
 
-- [ ] 6.1 Documentar en README la configuración previa de GLPI (primer arranque, cambio de contraseñas, habilitación de REST API, creación de cliente API y usuario API, configuración SMTP para notificaciones, volcado de tokens al `.env`) con placeholders no triviales (spec `despliegue-glpi`). Incluir también el comportamiento de auditoría de errores (registro de `status='error'` cuando GLPI falla).
-- [ ] 6.2 Sincronizar las specs delta a las specs principales (`openspec-sync-specs`): aplicar MODIFIED en `automatizacion-web` y crear/agregar la capacidad `despliegue-glpi` en main specs.
+- [x] 6.1 Documentar en README la configuración previa de GLPI (primer arranque, cambio de contraseñas, habilitación de REST API, creación de cliente API y usuario API, configuración SMTP para notificaciones, volcado de tokens al `.env`) con placeholders no triviales (spec `despliegue-glpi`). Incluir también el comportamiento de auditoría de errores (registro de `status='error'` cuando GLPI falla).
+- [x] 6.2 Sincronizar las specs delta a las specs principales (`openspec-sync-specs`): aplicar MODIFIED en `automatizacion-web` y crear/agregar la capacidad `despliegue-glpi` en main specs. **(agent-driven: el CLI v1.4.1 no expone `sync-specs`; validado con `openspec spec validate`)**
 - [ ] 6.3 Archivar el change (`openspec-archive-change`) tras confirmar la verificación end-to-end y aplicar el cierre (`/opsx-archive`).
