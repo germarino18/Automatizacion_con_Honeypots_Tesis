@@ -1,3 +1,6 @@
+## Purpose
+La API FastAPI del SOC (`soc-api`) SHALL exponer a la consola web los datos de la plataforma — métricas de overview, explorador de eventos con filtros y paginación, detalle de evento, técnicas MITRE, orígenes geográficos (best-effort), malware/IoC y salud de servicios — autenticando por sesión JWT y emitiendo eventos en vivo por SSE.
+
 ## Requirements
 
 ### Requirement: La API SHALL autenticar por sesión JWT

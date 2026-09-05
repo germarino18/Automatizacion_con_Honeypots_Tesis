@@ -1,3 +1,6 @@
+## Purpose
+El despliegue SHALL levantar la consola web del SOC (`api` + `web` + `nginx` + `postgres`) en docker-compose, con credenciales por entorno sin literales, servicios de administración expuestos solo en loopback, control de egress deny-by-default en el host, quickstart de `.env` y verificación end-to-end.
+
 ## Requirements
 
 ### Requirement: El servicio `api` SHALL desplegarse en docker-compose

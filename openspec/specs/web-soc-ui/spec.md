@@ -1,3 +1,6 @@
+## Purpose
+La aplicación web SHALL ser una SPA (React + Vite + TypeScript) que reproduzca las 8 pantallas del prototipo Obsidian Sentinel — resumen del SOC, ataques en vivo, mapa geográfico, automatización y respuesta, malware & IoC, login, matriz MITRE ATT&CK y explorador de eventos — consumiendo la API del SOC con login, datos en vivo y el design system definido.
+
 ## Requirements
 
 ### Requirement: La aplicación SHALL ser un SPA con las 8 pantallas del prototipo

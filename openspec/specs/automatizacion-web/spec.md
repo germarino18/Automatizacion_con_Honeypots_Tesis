@@ -1,3 +1,6 @@
+## Purpose
+La capacidad de automatización SHALL orquestar acciones reales sobre n8n — ejecutar el playbook de simulación por la cadena real, registrar bloqueos de IP y crear tickets GLPI reales vía API REST — exponiendo workflows, ejecuciones y el historial de respuestas a la consola web con auditoría en la tabla `responses`.
+
 ## Requirements
 
 ### Requirement: La API SHALL listar los workflows de n8n
