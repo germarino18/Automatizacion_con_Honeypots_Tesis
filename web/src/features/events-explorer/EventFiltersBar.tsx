@@ -54,8 +54,8 @@ export default function EventFiltersBar({
         onApply(draft);
       }}
     >
-      <div className="filter-field">
-        <label htmlFor="filter-from">Desde (UTC)</label>
+      <div className="field">
+        <label className="label" htmlFor="filter-from">Desde (UTC)</label>
         <input
           id="filter-from"
           type="datetime-local"
@@ -64,8 +64,8 @@ export default function EventFiltersBar({
         />
       </div>
 
-      <div className="filter-field">
-        <label htmlFor="filter-to">Hasta (UTC)</label>
+      <div className="field">
+        <label className="label" htmlFor="filter-to">Hasta (UTC)</label>
         <input
           id="filter-to"
           type="datetime-local"
@@ -74,8 +74,8 @@ export default function EventFiltersBar({
         />
       </div>
 
-      <div className="filter-field">
-        <label htmlFor="filter-severity">Severidad</label>
+      <div className="field">
+        <label className="label" htmlFor="filter-severity">Severidad</label>
         <select
           id="filter-severity"
           value={draft.severity}
@@ -92,8 +92,8 @@ export default function EventFiltersBar({
         </select>
       </div>
 
-      <div className="filter-field">
-        <label htmlFor="filter-honeypot">Honeypot</label>
+      <div className="field">
+        <label className="label" htmlFor="filter-honeypot">Honeypot</label>
         <select
           id="filter-honeypot"
           value={draft.source_honeypot}
@@ -108,8 +108,8 @@ export default function EventFiltersBar({
         </select>
       </div>
 
-      <div className="filter-field">
-        <label htmlFor="filter-protocol">Protocolo</label>
+      <div className="field">
+        <label className="label" htmlFor="filter-protocol">Protocolo</label>
         <input
           id="filter-protocol"
           type="text"
@@ -119,8 +119,8 @@ export default function EventFiltersBar({
         />
       </div>
 
-      <div className="filter-field">
-        <label htmlFor="filter-src-ip">IP origen</label>
+      <div className="field">
+        <label className="label" htmlFor="filter-src-ip">IP origen</label>
         <input
           id="filter-src-ip"
           type="text"
@@ -130,8 +130,8 @@ export default function EventFiltersBar({
         />
       </div>
 
-      <div className="filter-field">
-        <label htmlFor="filter-technique">Técnica MITRE</label>
+      <div className="field">
+        <label className="label" htmlFor="filter-technique">Técnica MITRE</label>
         <input
           id="filter-technique"
           type="text"
@@ -141,8 +141,8 @@ export default function EventFiltersBar({
         />
       </div>
 
-      <div className="filter-field filter-field-wide">
-        <label htmlFor="filter-search">Búsqueda de texto</label>
+      <div className="field field-wide">
+        <label className="label" htmlFor="filter-search">Búsqueda de texto</label>
         <input
           id="filter-search"
           type="search"
@@ -153,10 +153,10 @@ export default function EventFiltersBar({
       </div>
 
       <div className="filter-actions">
-        <button type="submit" className="btn btn-accent">
+        <button type="submit" className="btn btn--primary">
           Aplicar filtros
         </button>
-        <button type="button" className="btn btn-ghost" onClick={onReset}>
+        <button type="button" className="btn btn--ghost" onClick={onReset}>
           Restablecer
         </button>
       </div>

@@ -19,9 +19,9 @@ type ModalKind = 'simulate' | 'block' | 'ticket' | null;
 
 function executionStatusBadge(status: string | null | undefined): string {
   const value = (status ?? '').toLowerCase();
-  if (value === 'success') return 'badge-status success';
+  if (value === 'success') return 'badge badge--status badge--status-success';
   if (value === 'error' || value === 'failed' || value === 'crashed') {
-    return 'badge-status danger';
+    return 'badge badge--status badge--status-danger';
   }
   if (
     value === 'running' ||
@@ -29,16 +29,16 @@ function executionStatusBadge(status: string | null | undefined): string {
     value === 'new' ||
     value === 'active'
   ) {
-    return 'badge-status running';
+    return 'badge badge--status badge--status-running';
   }
-  return 'badge-status';
+  return 'badge badge--status';
 }
 
 function actionTypeBadge(actionType: string): string {
   const value = actionType.toLowerCase();
-  if (value.includes('bloqueo')) return 'badge-action bloqueo';
-  if (value.includes('alerta')) return 'badge-action alerta';
-  return 'badge-action';
+  if (value.includes('bloqueo')) return 'badge badge--action badge--action-bloqueo';
+  if (value.includes('alerta')) return 'badge badge--action badge--action-alerta';
+  return 'badge badge--action';
 }
 
 function ExecutionsTable({
@@ -262,7 +262,7 @@ export default function Automatizacion() {
       <div className="actions-row">
         <button
           type="button"
-          className="btn btn-accent"
+          className="btn btn--primary"
           disabled={n8nDown}
           title={n8nDown ? 'Requiere n8n disponible' : undefined}
           onClick={() => openModal('simulate')}
@@ -271,7 +271,7 @@ export default function Automatizacion() {
         </button>
         <button
           type="button"
-          className="btn btn-ghost"
+          className="btn btn--ghost"
           disabled={n8nDown}
           title={n8nDown ? 'Requiere n8n disponible' : undefined}
           onClick={() => openModal('block')}
@@ -280,7 +280,7 @@ export default function Automatizacion() {
         </button>
         <button
           type="button"
-          className="btn btn-ghost"
+          className="btn btn--ghost"
           disabled={n8nDown}
           title={n8nDown ? 'Requiere n8n disponible' : undefined}
           onClick={() => openModal('ticket')}
@@ -362,7 +362,7 @@ export default function Automatizacion() {
                 <div className="pagination">
                   <button
                     type="button"
-                    className="btn btn-ghost"
+                    className="btn btn--ghost"
                     disabled={page <= 1}
                     onClick={() => setPage((current) => current - 1)}
                   >
@@ -370,7 +370,7 @@ export default function Automatizacion() {
                   </button>
                   <button
                     type="button"
-                    className="btn btn-ghost"
+                    className="btn btn--ghost"
                     disabled={page >= totalPages}
                     onClick={() => setPage((current) => current + 1)}
                   >

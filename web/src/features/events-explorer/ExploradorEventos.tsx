@@ -86,7 +86,7 @@ export default function ExploradorEventos() {
           ) : null}
           <button
             type="button"
-            className="btn btn-ghost"
+            className="btn btn--ghost"
             disabled={exporting || total === 0}
             onClick={() => {
               void handleExport();
@@ -145,7 +145,7 @@ export default function ExploradorEventos() {
                 </select>
                 <button
                   type="button"
-                  className="btn btn-ghost"
+                  className="btn btn--ghost"
                   disabled={page <= 1}
                   onClick={() => goToPage(page - 1)}
                 >
@@ -153,7 +153,7 @@ export default function ExploradorEventos() {
                 </button>
                 <button
                   type="button"
-                  className="btn btn-ghost"
+                  className="btn btn--ghost"
                   disabled={page >= totalPages}
                   onClick={() => goToPage(page + 1)}
                 >

@@ -1,10 +1,47 @@
+import { readFileSync } from 'node:fs';
+
 import { describe, expect, it } from 'vitest';
 
+import {
+  TOKEN_ACCENT,
+  TOKEN_ACCENT_STRONG,
+  TOKEN_BG_ELEVATED,
+} from '../../lib/colorTokens';
 import {
   BUCKET_COLORS,
   MAP_NEUTRAL_COLOR,
   buildColorScale,
 } from './colorScale';
+
+function readCssVar(name: string): string {
+  const css = readFileSync(
+    new URL('../../styles/tokens.css', import.meta.url),
+    'utf8',
+  );
+  const match = css.match(new RegExp(`--${name}:\\s*([^;]+);`));
+  if (!match) {
+    throw new Error(`Token --${name} no encontrado en tokens.css`);
+  }
+  return match[1].trim();
+}
+
+describe('sincronía con tokens del design system', () => {
+  it('BUCKET_COLORS y MAP_NEUTRAL_COLOR coinciden con los tokens CSS', () => {
+    expect(TOKEN_ACCENT).toBe(readCssVar('accent'));
+    expect(TOKEN_ACCENT_STRONG).toBe(readCssVar('accent-strong'));
+    expect(TOKEN_BG_ELEVATED).toBe(readCssVar('bg-elevated'));
+
+    expect(BUCKET_COLORS[2]).toBe(TOKEN_ACCENT_STRONG);
+    expect(BUCKET_COLORS[3]).toBe(TOKEN_ACCENT);
+    expect(MAP_NEUTRAL_COLOR).toBe(TOKEN_BG_ELEVATED);
+  });
+
+  it('la rampa conserva sus extremos oscuro/claro (no son los tokens)', () => {
+    expect(BUCKET_COLORS).toHaveLength(5);
+    expect(BUCKET_COLORS[0]).not.toBe(TOKEN_ACCENT);
+    expect(BUCKET_COLORS[BUCKET_COLORS.length - 1]).not.toBe(TOKEN_ACCENT);
+  });
+});
 
 describe('buildColorScale', () => {
   it('con lista vacia no genera buckets y devuelve color neutral', () => {

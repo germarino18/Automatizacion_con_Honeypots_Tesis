@@ -43,8 +43,8 @@ export default function Login() {
           Acceso a la consola del SOC con tus credenciales de operador.
         </p>
         <form className="login-form" onSubmit={handleSubmit}>
-          <label className="login-field">
-            <span>Usuario</span>
+          <label className="field">
+            <span className="label">Usuario</span>
             <input
               type="text"
               name="username"
@@ -54,8 +54,8 @@ export default function Login() {
               required
             />
           </label>
-          <label className="login-field">
-            <span>Contraseña</span>
+          <label className="field">
+            <span className="label">Contraseña</span>
             <input
               type="password"
               name="password"
@@ -66,13 +66,13 @@ export default function Login() {
             />
           </label>
           {error && (
-            <p className="login-error" role="alert">
+            <p className="error-box" role="alert">
               {error}
             </p>
           )}
           <button
             type="submit"
-            className="login-submit"
+            className="btn btn--primary"
             disabled={submitting || username === '' || password === ''}
           >
             {submitting ? 'Ingresando…' : 'Ingresar'}

@@ -108,6 +108,13 @@ function BrandMark() {
   );
 }
 
+function statusLabel(status: string): string {
+  if (status === 'ok') return 'operativo';
+  if (status === 'down') return 'caído';
+  if (status === 'degraded') return 'degradado';
+  return status;
+}
+
 function ServiceStatus() {
   const { data, isError } = useServicesHealth();
 
@@ -135,7 +142,7 @@ function ServiceStatus() {
         <div className="service-status" key={service.key}>
           <span
             className={`status-dot ${service.status}`}
-            title={service.status}
+            title={statusLabel(service.status)}
           />
           <span>{service.label}</span>
         </div>
@@ -166,9 +173,10 @@ export default function Sidebar() {
             className={({ isActive }) =>
               `sidebar-link${isActive ? ' active' : ''}`
             }
+            title={item.label}
           >
             {item.icon}
-            {item.label}
+            <span className="sidebar-link-label">{item.label}</span>
           </NavLink>
         ))}
       </nav>

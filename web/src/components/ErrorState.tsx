@@ -9,7 +9,7 @@ export default function ErrorState({ message, onRetry }: ErrorStateProps) {
     <div className="error-state" role="alert">
       <span className="error-state-title">Error al cargar los datos</span>
       {message ? <span className="error-state-message">{message}</span> : null}
-      <button type="button" className="error-state-retry" onClick={onRetry}>
+      <button type="button" className="error-state-retry btn btn--ghost" onClick={onRetry}>
         Reintentar
       </button>
     </div>

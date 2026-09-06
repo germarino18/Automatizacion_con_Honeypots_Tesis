@@ -1,7 +1,6 @@
 import SeverityBadge from '../../components/SeverityBadge';
 import type { EventItem } from '../../lib/api';
 import { formatRiskScore, formatTimestamp } from '../../lib/formatters';
-import { selectionHasText } from '../../lib/selection';
 
 interface EventsTableProps {
   events: EventItem[];
@@ -15,12 +14,6 @@ export default function EventsTable({
   fetching = false,
   onSelect,
 }: EventsTableProps) {
-  function handleRowClick(event: EventItem): void {
-    // Ignorar el click si el usuario estaba seleccionando texto
-    if (selectionHasText(window.getSelection())) return;
-    onSelect(event);
-  }
-
   return (
     <div className={`table-scroll${fetching ? ' is-refreshing' : ''}`}>
       <table className="data-table">
@@ -35,15 +28,14 @@ export default function EventsTable({
             <th scope="col">Riesgo</th>
             <th scope="col">Severidad</th>
             <th scope="col">Malware</th>
+            <th scope="col">
+              <span className="visually-hidden">Acciones</span>
+            </th>
           </tr>
         </thead>
         <tbody>
           {events.map((event) => (
-            <tr
-              key={event.id}
-              className="row-clickable"
-              onClick={() => handleRowClick(event)}
-            >
+            <tr key={event.id}>
               <td className="font-mono">{formatTimestamp(event.timestamp)}</td>
               <td className="font-mono">{event.src_ip}</td>
               <td>{event.source_honeypot}</td>
@@ -66,6 +58,15 @@ export default function EventsTable({
                 ) : (
                   <span className="cell-muted">—</span>
                 )}
+              </td>
+              <td>
+                <button
+                  type="button"
+                  className="btn btn--ghost row-detail-btn"
+                  onClick={() => onSelect(event)}
+                >
+                  Ver detalle
+                </button>
               </td>
             </tr>
           ))}

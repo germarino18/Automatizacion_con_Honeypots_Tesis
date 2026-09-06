@@ -8,10 +8,10 @@ export default function AppShell() {
   return (
     <div className="app-shell">
       <Sidebar />
-      <div className="app-main">
+      <main className="app-main">
         <Header />
         <Outlet />
-      </div>
+      </main>
     </div>
   );
 }

@@ -1,6 +1,9 @@
+import { useRef } from 'react';
+
 import EmptyState from '../../components/EmptyState';
 import ErrorState from '../../components/ErrorState';
 import SeverityBadge from '../../components/SeverityBadge';
+import { useDialogLock } from '../../hooks/useDialogLock';
 import type { EventItem, ResponseItem } from '../../lib/api';
 import { formatTimestamp } from '../../lib/formatters';
 import { useEventDetail } from './useEvents';
@@ -13,7 +16,7 @@ interface EventDetailDrawerProps {
 function DetailField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="detail-field">
-      <dt>{label}</dt>
+      <dt className="label">{label}</dt>
       <dd>{children}</dd>
     </div>
   );
@@ -65,6 +68,9 @@ export default function EventDetailDrawer({
   eventId,
   onClose,
 }: EventDetailDrawerProps) {
+  const overlayRef = useRef<HTMLDivElement | null>(null);
+  useDialogLock({ open: eventId !== null, onClose, dialogRef: overlayRef });
+
   const { data, isPending, isError, error, refetch } = useEventDetail(eventId);
 
   if (eventId === null) return null;
@@ -72,7 +78,7 @@ export default function EventDetailDrawer({
   const event: EventItem | null = data ?? null;
 
   return (
-    <div className="drawer-overlay" onClick={onClose}>
+    <div className="overlay" ref={overlayRef} onClick={onClose}>
       <aside
         className="drawer"
         role="dialog"
@@ -86,7 +92,7 @@ export default function EventDetailDrawer({
           </h2>
           <button
             type="button"
-            className="btn btn-ghost drawer-close"
+            className="btn btn--ghost drawer-close"
             onClick={onClose}
           >
             Cerrar

@@ -46,8 +46,8 @@ export function SimulateModal({ onClose, onDone }: ActionModalProps) {
         )
       }
     >
-      <label className="modal-field">
-        <span>Honeypot</span>
+      <label className="field">
+        <span className="label">Honeypot</span>
         <select
           value={honeypot}
           onChange={(event) =>
@@ -58,8 +58,8 @@ export function SimulateModal({ onClose, onDone }: ActionModalProps) {
           <option value="dionaea">Dionaea (malware)</option>
         </select>
       </label>
-      <label className="modal-field">
-        <span>Payload</span>
+      <label className="field">
+        <span className="label">Payload</span>
         <textarea
           rows={6}
           value={payloadText}
@@ -106,8 +106,8 @@ export function BlockIpModal({ onClose, onDone }: ActionModalProps) {
         );
       }}
     >
-      <label className="modal-field">
-        <span>IP origen</span>
+      <label className="field">
+        <span className="label">IP origen</span>
         <input
           type="text"
           value={ip}
@@ -120,8 +120,8 @@ export function BlockIpModal({ onClose, onDone }: ActionModalProps) {
           <small className="modal-hint-error">Formato IPv4 inválido.</small>
         ) : null}
       </label>
-      <label className="modal-field">
-        <span>Razón</span>
+      <label className="field">
+        <span className="label">Razón</span>
         <input
           type="text"
           value={reason}
@@ -129,8 +129,8 @@ export function BlockIpModal({ onClose, onDone }: ActionModalProps) {
           placeholder="Fuerza bruta SSH detectada"
         />
       </label>
-      <label className="modal-field">
-        <span>Duración (segundos, opcional)</span>
+      <label className="field">
+        <span className="label">Duración (segundos, opcional)</span>
         <input
           type="text"
           inputMode="numeric"
@@ -179,8 +179,8 @@ export function TicketModal({ onClose, onDone }: ActionModalProps) {
         );
       }}
     >
-      <label className="modal-field">
-        <span>Nombre</span>
+      <label className="field">
+        <span className="label">Nombre</span>
         <input
           type="text"
           value={name}
@@ -189,8 +189,8 @@ export function TicketModal({ onClose, onDone }: ActionModalProps) {
           autoFocus
         />
       </label>
-      <label className="modal-field">
-        <span>Contenido</span>
+      <label className="field">
+        <span className="label">Contenido</span>
         <textarea
           rows={5}
           value={content}
@@ -198,8 +198,8 @@ export function TicketModal({ onClose, onDone }: ActionModalProps) {
           placeholder="Descripción del incidente para el ticket…"
         />
       </label>
-      <label className="modal-field">
-        <span>Urgencia</span>
+      <label className="field">
+        <span className="label">Urgencia</span>
         <select value={urgency} onChange={(e) => setUrgency(e.target.value)}>
           <option value="low">Baja</option>
           <option value="medium">Media</option>

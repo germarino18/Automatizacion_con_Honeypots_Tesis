@@ -1,4 +1,7 @@
+import { useRef } from 'react';
 import type { FormEvent, ReactNode } from 'react';
+
+import { useDialogLock } from '../hooks/useDialogLock';
 
 interface ModalProps {
   title: string;
@@ -22,13 +25,21 @@ export default function Modal({
   onSubmit,
   children,
 }: ModalProps) {
+  const overlayRef = useRef<HTMLDivElement | null>(null);
+  useDialogLock({ open: true, onClose, dialogRef: overlayRef });
+
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     onSubmit();
   };
 
   return (
-    <div className="modal-overlay" role="presentation" onMouseDown={onClose}>
+    <div
+      className="overlay overlay--modal"
+      role="presentation"
+      ref={overlayRef}
+      onMouseDown={onClose}
+    >
       <div
         className="modal-card"
         role="dialog"
@@ -38,21 +49,21 @@ export default function Modal({
       >
         <h2 className="modal-title">{title}</h2>
         {error ? (
-          <p className="modal-error" role="alert">
+          <p className="error-box" role="alert">
             {error}
           </p>
         ) : null}
         <form onSubmit={handleSubmit}>
-          <fieldset disabled={pending} className="modal-fieldset">
+          <fieldset disabled={pending} className="fieldset">
             {children}
           </fieldset>
           <div className="modal-actions">
-            <button type="button" className="btn btn-ghost" onClick={onClose}>
+            <button type="button" className="btn btn--ghost" onClick={onClose}>
               Cancelar
             </button>
             <button
               type="submit"
-              className="btn btn-accent"
+              className="btn btn--primary"
               disabled={pending || submitDisabled}
             >
               {pending ? 'Enviando…' : submitLabel}

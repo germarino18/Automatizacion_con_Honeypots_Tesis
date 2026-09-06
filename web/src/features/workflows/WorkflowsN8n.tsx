@@ -8,7 +8,7 @@ const N8N_EDITOR_BASE = 'http://localhost:5678/workflow';
 
 function ActiveBadge({ active }: { active: boolean }) {
   return (
-    <span className={`badge-status ${active ? 'success' : ''}`}>
+    <span className={`badge badge--status ${active ? 'badge--status-success' : ''}`}>
       {active ? 'Activo' : 'Inactivo'}
     </span>
   );
@@ -89,7 +89,7 @@ export default function WorkflowsN8n() {
                     </td>
                     <td>
                       <a
-                        className="btn btn-ghost"
+                        className="btn btn--ghost"
                         href={`${N8N_EDITOR_BASE}/${String(workflow.id)}`}
                         target="_blank"
                         rel="noopener noreferrer"

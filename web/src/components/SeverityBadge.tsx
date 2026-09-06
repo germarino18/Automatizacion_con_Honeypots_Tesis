@@ -14,6 +14,8 @@ interface SeverityBadgeProps {
 /** Badge de severidad con la escala semántica del design system. */
 export default function SeverityBadge({ severity }: SeverityBadgeProps) {
   return (
-    <span className={`badge-severity ${severity}`}>{LABELS[severity]}</span>
+    <span className={`badge badge--severity badge--severity-${severity}`}>
+      {LABELS[severity]}
+    </span>
   );
 }
