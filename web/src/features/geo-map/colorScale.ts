@@ -1,7 +1,7 @@
 /*
  * Escala de color para el mapa de origen de ataques.
- * Cuantiza los conteos en ~5 buckets (min..max) con una rampa cian del
- * design system Obsidian Sentinel: más ataques = más brillante.
+ * Cuantiza los conteos en ~5 buckets (min..max) con la rampa azul v3
+ * del design system threat-ops: más ataques = más brillante.
  * Los tonos intermedios y el neutral provienen de los tokens CSS
  * (ver colorTokens.ts, sincronizado por colorScale.test.ts).
  */
@@ -13,11 +13,11 @@ import {
 } from '../../lib/colorTokens';
 
 export const BUCKET_COLORS = [
-  '#155e75',
-  '#0e7490',
+  '#242b66',
+  '#3742a8',
   TOKEN_ACCENT_STRONG,
   TOKEN_ACCENT,
-  '#67e8f9',
+  '#9aa6ff',
 ] as const;
 
 /** Color de países sin datos (superficie elevada del design system). */

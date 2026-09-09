@@ -40,6 +40,7 @@ declare module 'react-simple-maps' {
     stroke?: string;
     strokeWidth?: number;
     className?: string;
+    onClick?: () => void;
     children?: ReactNode;
   }
 

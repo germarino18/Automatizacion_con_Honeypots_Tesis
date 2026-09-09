@@ -237,6 +237,10 @@ async def insert_response(conn, **overrides) -> dict:
     defaults.update(overrides)
     if isinstance(defaults["details"], dict):
         defaults["details"] = json.dumps(defaults["details"])
+    if isinstance(defaults.get("timestamp"), str):
+        defaults["timestamp"] = datetime.fromisoformat(
+            defaults["timestamp"].replace("Z", "+00:00")
+        )
     columns = ["event_id", "action_type", "actor", "status", "evidence_uri", "details"]
     if defaults.get("timestamp") is not None:
         columns.append("timestamp")

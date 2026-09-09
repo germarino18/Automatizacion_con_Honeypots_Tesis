@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { apiGet, type EventItem, type EventPage } from '../../lib/api';
 import {
@@ -16,10 +16,16 @@ const EPS_WINDOW_MS = 10_000;
 /** Fallos de polling consecutivos antes de marcar el feed como offline. */
 const MAX_POLL_FAILURES = 2;
 
+export interface UseLiveEventsOptions {
+  /** En pausa se congela el buffer y la ventana EPS; la suscripción SSE/polling sigue activa. */
+  paused?: boolean;
+}
+
 export interface UseLiveEventsResult {
   events: EventItem[];
   status: LiveConnection;
   eventsPerSecond: number;
+  paused: boolean;
 }
 
 /**
@@ -27,11 +33,22 @@ export interface UseLiveEventsResult {
  * `/api/v1/events/live` (eventos nombrados `event` + heartbeats `ping`),
  * con degradación a polling de `/api/v1/events` tras MAX_SSE_FAILURES
  * errores consecutivos. Un 401 en polling redirige al login vía api.ts.
+ *
+ * Con `paused: true` la suscripción se mantiene pero los eventos entrantes
+ * no se acumulan (buffer congelado) ni se registran en la ventana EPS
+ * (UI-only, sin tocar el backend).
  */
-export function useLiveEvents(): UseLiveEventsResult {
+export function useLiveEvents({
+  paused = false,
+}: UseLiveEventsOptions = {}): UseLiveEventsResult {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [status, setStatus] = useState<LiveConnection>('sse');
   const [eventsPerSecond, setEventsPerSecond] = useState(0);
+  const pausedRef = useRef(paused);
+
+  useEffect(() => {
+    pausedRef.current = paused;
+  }, [paused]);
 
   useEffect(() => {
     let disposed = false;
@@ -41,11 +58,12 @@ export function useLiveEvents(): UseLiveEventsResult {
     const arrivals: number[] = [];
 
     const applyEvents = (incoming: EventItem[]) => {
-      if (incoming.length === 0) return;
+      if (incoming.length === 0 || pausedRef.current) return;
       setEvents((previous) => mergeEvents(previous, incoming, MAX_LIVE_EVENTS));
     };
 
     const registerArrival = () => {
+      if (pausedRef.current) return;
       const now = Date.now();
       arrivals.push(now);
       while (arrivals.length > 0 && now - arrivals[0] > EPS_WINDOW_MS * 2) {
@@ -111,6 +129,7 @@ export function useLiveEvents(): UseLiveEventsResult {
     };
 
     const epsTimer = setInterval(() => {
+      if (pausedRef.current) return;
       setEventsPerSecond(computeEventsPerSecond(arrivals, Date.now()));
     }, 1_000);
 
@@ -122,5 +141,5 @@ export function useLiveEvents(): UseLiveEventsResult {
     };
   }, []);
 
-  return { events, status, eventsPerSecond };
+  return { events, status, eventsPerSecond, paused };
 }

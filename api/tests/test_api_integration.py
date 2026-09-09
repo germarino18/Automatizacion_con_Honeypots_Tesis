@@ -46,6 +46,36 @@ async def test_overview_401_without_token(client):
 
 
 @pytest.mark.asyncio
+async def test_overview_serializes_trend_buckets_and_bloqueos(auth_client, conn):
+    await insert_event(
+        conn,
+        source_honeypot="cowrie",
+        src_ip="1.1.1.1",
+        timestamp="2026-01-01T10:30:00+00:00",
+    )
+    await insert_response(
+        conn,
+        action_type="bloqueo",
+        status="completed",
+        timestamp="2026-01-01T11:00:00+00:00",
+    )
+
+    resp = await auth_client.get(
+        "/api/v1/overview", params={"to": "2026-01-01T12:00:00+00:00"}
+    )
+    assert resp.status_code == 200
+    body = Overview.model_validate(resp.json())
+
+    # Serialización de los 24 buckets (hour ISO UTC + count int).
+    assert len(body.eventos_por_hora) == 24
+    bucket = body.eventos_por_hora[0]
+    assert isinstance(bucket.hour.isoformat(), str)
+    assert isinstance(bucket.count, int)
+    assert sum(b.count for b in body.eventos_por_hora) == 1
+    assert body.bloqueos_ufw == 1
+
+
+@pytest.mark.asyncio
 async def test_events_paginated_shape(auth_client, conn):
     for i in range(5):
         await insert_event(conn, src_ip=f"10.0.0.{i}")

@@ -271,7 +271,7 @@ export default function Automatizacion() {
         </button>
         <button
           type="button"
-          className="btn btn--ghost"
+          className="btn btn--primary"
           disabled={n8nDown}
           title={n8nDown ? 'Requiere n8n disponible' : undefined}
           onClick={() => openModal('block')}
@@ -280,7 +280,7 @@ export default function Automatizacion() {
         </button>
         <button
           type="button"
-          className="btn btn--ghost"
+          className="btn btn--primary"
           disabled={n8nDown}
           title={n8nDown ? 'Requiere n8n disponible' : undefined}
           onClick={() => openModal('ticket')}

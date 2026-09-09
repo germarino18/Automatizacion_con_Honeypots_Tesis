@@ -5,7 +5,15 @@ MTTR = AVG(response.timestamp - event.timestamp) over responses joined to
        their event (NULL when there is no response data).
 Critical alerts = events with risk_score in the critical bucket, most recent
 first (bounded list).
+eventos_por_hora = 24 hourly buckets (UTC) of honeypot_events counts aligned
+to an anchor (the `to` bound, or now when no range is given), so the hero
+sparkline always covers the last 24h.
+bloqueos_ufw = count of completed firewall-block automation actions (rows in
+`responses` with action_type 'bloqueo' — the value written by the
+firewall-block workflow for an automatic UFW/firewall block).
 """
+
+from datetime import datetime, timedelta, timezone
 
 from ..services.severity import BUCKETS, severity_for
 
@@ -13,6 +21,7 @@ CRITICAL_LOW = next(b[1] for b in BUCKETS if b[0] == "critical")
 
 TOP_IPS_LIMIT = 10
 CRITICAL_ALERTS_LIMIT = 10
+WINDOW_HOURS = 24
 
 
 def _range_clause(alias, from_, to):
@@ -70,6 +79,10 @@ async def get_overview(conn, from_, to) -> dict:
         *range_params,
     )
 
+    anchor = to or datetime.now(timezone.utc)
+    eventos_por_hora = await _eventos_por_hora(conn, anchor)
+    bloqueos_ufw = await _bloqueos_ufw(conn, from_, to)
+
     return {
         "total_eventos": total_eventos or 0,
         "ips_unicas": ips_unicas or 0,
@@ -79,7 +92,43 @@ async def get_overview(conn, from_, to) -> dict:
         "total_malware": total_malware or 0,
         "mttd_seconds": float(mttd_seconds) if mttd_seconds is not None else None,
         "mttr_seconds": float(mttr_seconds) if mttr_seconds is not None else None,
+        "eventos_por_hora": eventos_por_hora,
+        "bloqueos_ufw": bloqueos_ufw,
     }
+
+
+async def _eventos_por_hora(conn, anchor) -> list[dict]:
+    """24 buckets UTC (hour, count) alineados al anchor, de hace 23h a la
+    hora del anchor inclusive. Horas sin eventos quedan en 0."""
+    start = (anchor - timedelta(hours=WINDOW_HOURS - 1)).replace(
+        minute=0, second=0, microsecond=0
+    )
+    end = anchor.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+    rows = await conn.fetch(
+        "SELECT date_trunc('hour', timestamp) AS hour, COUNT(*) AS count "
+        "FROM honeypot_events WHERE timestamp >= $1 AND timestamp < $2 "
+        "GROUP BY date_trunc('hour', timestamp) ORDER BY hour",
+        start,
+        end,
+    )
+    counts = {r["hour"]: r["count"] for r in rows}
+    buckets = []
+    current = start
+    while current < end:
+        buckets.append({"hour": current, "count": int(counts.get(current, 0))})
+        current += timedelta(hours=1)
+    return buckets
+
+
+async def _bloqueos_ufw(conn, from_, to) -> int:
+    """Bloqueos automáticos de firewall registrados (responses 'bloqueo')."""
+    where, params = _range_clause("timestamp", from_, to)
+    sql = "SELECT COUNT(*) FROM responses WHERE action_type = 'bloqueo'"
+    if where:
+        # `where` trae el keyword WHERE; lo convertimos en AND de la condición.
+        sql += " AND " + where[len("WHERE") :].strip()
+    count = await conn.fetchval(sql, *params)
+    return int(count) if count is not None else 0
 
 
 async def _top_ips(conn, range_params):

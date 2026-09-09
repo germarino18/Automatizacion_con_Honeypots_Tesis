@@ -30,6 +30,11 @@ class CriticalAlert(BaseModel):
     severity: str
 
 
+class HourlyBucket(BaseModel):
+    hour: datetime
+    count: int
+
+
 class Overview(BaseModel):
     total_eventos: int = 0
     ips_unicas: int = 0
@@ -39,3 +44,5 @@ class Overview(BaseModel):
     total_malware: int = 0
     mttd_seconds: float | None = None
     mttr_seconds: float | None = None
+    eventos_por_hora: list[HourlyBucket] = []
+    bloqueos_ufw: int = 0

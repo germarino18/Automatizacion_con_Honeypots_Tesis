@@ -1,43 +1,59 @@
 /*
- * Design system "Obsidian Sentinel" — tokens del prototipo Stitch
- * (Honeypot SOC: Threat Intelligence Platform).
+ * Design system v3 "Honeypot SOC / threat ops" — tokens del mockup
+ * aprobado (Honeypot SOC v3). Dark-first near-black con accent azul
+ * `#5468ff`, tipografía UI Chivo y telemetría JetBrains Mono.
  *
- * Fuentes woff2 LOCALES: Inter y JetBrains Mono se venden vía npm
- * (@fontsource/inter, @fontsource/jetbrains-mono) y Vite las empaqueta
- * en dist/assets. No hay CDN ni Google Fonts: la consola funciona en la
- * red interna sin salida a internet. Los @font-face los emiten esos
- * paquetes; aquí solo se declaran las pilas de fuentes y utilidades.
+ * Fuentes woff2 LOCALES: Chivo y JetBrains Mono se venden vía npm
+ * (@fontsource/chivo, @fontsource/jetbrains-mono) y Vite las empaqueta
+ * en dist/assets. No hay CDN ni Google Fonts: la
+ * consola funciona en la red interna sin salida a internet. Los
+ * @font-face los emiten esos paquetes; aquí solo se declaran las pilas
+ * de fuentes y utilidades.
+ *
+ * Convenciones conservadas del design system anterior (polish-ui):
+ * escalas `--space-*`, `--text-*`, `--z-*`, `--duration-*`,
+ * `--severity-*-soft`/`--severity-*-border` vía color-mix y primitivas
+ * compartidas en app.css.
  */
 
 :root {
-  /* Superficies (dark-first) */
-  --bg-base: #08080a;
-  --bg-surface: #111827;
-  --bg-elevated: #243244;
+  /* Superficies (dark-first near-black azulado) */
+  --bg-base: #0a0a0b;
+  --bg-surface: #131319;
+  --bg-elevated: #0f0f12;
   --bg-subtle: color-mix(in srgb, var(--bg-elevated) 50%, transparent);
   --bg-hover: color-mix(in srgb, var(--bg-elevated) 75%, transparent);
 
-  /* Marca */
-  --accent: #06b6d4;
-  --accent-strong: #0891b2;
-  --accent-soft: rgba(6, 182, 212, 0.14);
-  --accent-contrast: #06202a;
-  --success: #10b981;
-  --success-soft: rgba(16, 185, 129, 0.14);
+  /* Fondo de página v3: gradiente radial + grid overlay sutil */
+  --bg-radial: rgba(84, 104, 255, 0.13);
+  --grid-line: rgba(255, 255, 255, 0.016);
+
+  /* Marca v3 */
+  --accent: #5468ff;
+  --accent-strong: #4353cc;
+  --accent-soft: rgba(84, 104, 255, 0.18);
+  /* Etiqueta sobre accent: el mockup traía #101218 (4.28:1 sobre accent,
+     no AA normal); se oscurece a #08090f (4.55:1) manteniendo el look
+     "etiqueta oscura sobre azul". */
+  --accent-contrast: #08090f;
+  --link: #a7b0ff;
+  --link-hover: #cdd2ff;
+  --selection: rgba(84, 104, 255, 0.35);
+  --success: #5ce0a8;
+  --success-soft: rgba(92, 224, 168, 0.14);
   --success-border: color-mix(in srgb, var(--success) 45%, transparent);
 
-  /* Severidad semántica y variantes soft/borde derivadas (color-mix:
-     el color base es la única fuente de verdad). */
-  --severity-critical: #ef4444;
-  --severity-high: #f97316;
-  --severity-medium: #f59e0b;
-  --severity-low: #64748b;
+  /* Severidad v3 tono-por-tono sobre near-black: crítico rojo suave
+     (fg/borde/bg explícitos del mockup), alto ámbar, medio azul
+     (equivalente info/neutro), bajo neutro. Las variantes soft/borde de
+     alto/medio/bajo siguen derivándose vía color-mix de la base. */
+  --severity-critical: #ff8f80;
+  --severity-critical-border: rgba(255, 90, 70, 0.38);
+  --severity-critical-soft: rgba(255, 80, 60, 0.14);
+  --severity-high: #ffc46b;
+  --severity-medium: #a7b0ff;
+  --severity-low: #a1a1ab;
 
-  --severity-critical-soft: color-mix(
-    in srgb,
-    var(--severity-critical) 12%,
-    transparent
-  );
   --severity-high-soft: color-mix(in srgb, var(--severity-high) 12%, transparent);
   --severity-medium-soft: color-mix(
     in srgb,
@@ -46,11 +62,6 @@
   );
   --severity-low-soft: color-mix(in srgb, var(--severity-low) 12%, transparent);
 
-  --severity-critical-border: color-mix(
-    in srgb,
-    var(--severity-critical) 40%,
-    transparent
-  );
   --severity-high-border: color-mix(
     in srgb,
     var(--severity-high) 40%,
@@ -66,20 +77,37 @@
   --overlay-bg: rgba(2, 6, 23, 0.65);
 
   /* Texto */
-  --text-primary: #e2e8f0;
-  --text-secondary: #94a3b8;
-  --text-faint: #94a3b8;
+  --text-primary: #f2f2f4;
+  --text-secondary: #a1a1ab;
+  /* Faint reservado a adornos no esenciales; subido a #8b8b95 para AA. */
+  --text-faint: #8b8b95;
 
   /* Bordes y sombras */
-  --border-subtle: #273449;
-  --border-strong: #334155;
+  --border-subtle: #1f1f24;
+  --border-strong: #23232b;
   --shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.45),
     0 4px 16px rgba(0, 0, 0, 0.22);
+
+  /* Hero card "Ataques capturados" (mockup feedback operador, Fase 7).
+     --hero-muted: el mockup traía #6e6e78 (3.85:1 < AA); se sube a #8e8e99
+     (≥5.9:1 sobre #0d0d12 y ≥5.4:1 sobre #141733) manteniendo el look. */
+  --hero-bg-start: #141733;
+  --hero-bg-end: #0d0d12;
+  --hero-border: #1f1f24;
+  --hero-label: #8b93ff;
+  --hero-muted: #8e8e99;
+  --hero-scan: linear-gradient(90deg, transparent, #5468ff, transparent);
+  --trend-fill: rgba(84, 104, 255, 0.16);
+  --hero-tile-bg: #0d0d12;
+
+  /* Duración de la scanline del hero (7s); la card "Amenaza activa" la
+     sobreescribe con --scan-duration: 5s (mockup feedback Fase 8). */
+  --scan-duration: 7s;
 
   /* Geometría */
   --radius: 0.25rem;
   --radius-lg: 12px;
-  --sidebar-width: 240px;
+  --sidebar-w: 272px;
   --sidebar-width-rail: 64px;
   --header-height: 56px;
 
@@ -106,21 +134,24 @@
   --duration-base: 200ms;
   --duration-slow: 300ms;
 
-  /* Foco por teclado (sombra, no borde) */
-  --focus-ring: 0 0 0 2px var(--accent-soft);
+  /* Foco por teclado (sombra de 2px en accent #5468ff, no borde) */
+  --focus-ring: 0 0 0 2px var(--accent);
 
   /* Jerarquía de capas */
   --z-header: 10;
   --z-drawer: 50;
   --z-modal: 60;
 
-  /* Tipografía */
+  /* Tipografía: Chivo para toda la UI; JetBrains Mono para telemetría;
+     Space Mono sólo para los numerales/labels del hero card (mockup). */
   --font-ui:
-    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Chivo', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
     'Helvetica Neue', Arial, sans-serif;
   --font-mono:
     'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas,
     'Liberation Mono', monospace;
+  --font-mono-hero:
+    'Space Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 /* Utilidades de tipografía: texto de UI */

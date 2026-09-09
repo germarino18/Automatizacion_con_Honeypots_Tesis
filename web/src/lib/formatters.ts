@@ -18,6 +18,16 @@ export function formatInteger(value: number): string {
   return `${sign}${digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}`;
 }
 
+const esArFormatter = new Intl.NumberFormat('es-AR', {
+  maximumFractionDigits: 0,
+});
+
+/** Entero formateado con `Intl` es-AR (especificación bento), con fallback determinista. */
+export function formatEsArNumber(value: number): string {
+  if (!Number.isFinite(value)) return DASH;
+  return esArFormatter.format(value);
+}
+
 /**
  * Duración en segundos → texto humano ("42 s", "1,5 min", "2,5 h", "3,0 d").
  * Devuelve "—" para null/undefined/no finitos/negativos (MTTD/MTTR vacíos).

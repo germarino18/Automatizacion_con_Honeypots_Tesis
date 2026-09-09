@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   formatDuration,
+  formatEsArNumber,
   formatInteger,
   formatRiskScore,
   formatTimestamp,
@@ -57,6 +58,23 @@ describe('formatInteger', () => {
 
   it('mantiene el signo en negativos', () => {
     expect(formatInteger(-2500)).toBe('-2.500');
+  });
+});
+
+describe('formatEsArNumber', () => {
+  it('agrupa con la convención es-AR (punto de miles, sin decimales)', () => {
+    expect(formatEsArNumber(0)).toBe('0');
+    expect(formatEsArNumber(999)).toBe('999');
+    expect(formatEsArNumber(1_234_567)).toBe('1.234.567');
+  });
+
+  it('mantiene el signo en negativos', () => {
+    expect(formatEsArNumber(-84_501)).toBe('-84.501');
+  });
+
+  it('devuelve "—" para valores no finitos', () => {
+    expect(formatEsArNumber(Number.NaN)).toBe('—');
+    expect(formatEsArNumber(Number.POSITIVE_INFINITY)).toBe('—');
   });
 });
 

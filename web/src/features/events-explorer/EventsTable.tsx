@@ -62,7 +62,7 @@ export default function EventsTable({
               <td>
                 <button
                   type="button"
-                  className="btn btn--ghost row-detail-btn"
+                  className="btn btn--primary row-detail-btn"
                   onClick={() => onSelect(event)}
                 >
                   Ver detalle

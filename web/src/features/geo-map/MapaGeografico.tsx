@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { ComposableMap, Geographies, Geography } from 'react-simple-maps';
 
 import EmptyState from '../../components/EmptyState';
@@ -56,6 +56,7 @@ function Legend({
 /** Mapa Geográfico: origen de los ataques con topojson offline embebido. */
 export default function MapaGeografico() {
   const { data, isPending, isError, error, refetch } = useGeoCountries();
+  const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
 
   const atlasIndex = useMemo(
     () =>
@@ -80,6 +81,8 @@ export default function MapaGeografico() {
   );
 
   const scale = useMemo(() => buildColorScale(rows.map((row) => row.count)), [rows]);
+
+  const maxCount = Math.max(...rows.map((row) => row.count), 1);
 
   const countByGeoName = useMemo(() => {
     const counts = new Map<string, number>();
@@ -158,7 +161,14 @@ export default function MapaGeografico() {
                             key={geo.rsmKey}
                             geography={geo}
                             fill={fill}
-                            className="geo-path"
+                            className={`geo-path${
+                              selectedCountry === name ? ' is-selected' : ''
+                            }`}
+                            onClick={() =>
+                              setSelectedCountry(
+                                selectedCountry === name ? null : name,
+                              )
+                            }
                           >
                             <title>
                               {count === undefined
@@ -182,25 +192,42 @@ export default function MapaGeografico() {
                   {formatInteger(data.total)} eventos
                 </span>
               </h2>
-              <div className="table-scroll mapa-table-scroll">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>País</th>
-                      <th>Cantidad</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((row) => (
-                      <tr key={row.country}>
-                        <td title={row.geoName ?? 'Sin geometría en el mapa'}>
-                          {row.country}
-                        </td>
-                        <td className="font-mono">{formatInteger(row.count)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="country-list">
+                {rows.map((row) => (
+                  <button
+                    key={row.country}
+                    type="button"
+                    className={`country-row${
+                      selectedCountry === row.country ? ' is-selected' : ''
+                    }`}
+                    aria-pressed={selectedCountry === row.country}
+                    onClick={() =>
+                      setSelectedCountry(
+                        selectedCountry === row.country ? null : row.country,
+                      )
+                    }
+                  >
+                    <span className="country-row-top">
+                      <span
+                        className="country-row-name"
+                        title={row.geoName ?? 'Sin geometría en el mapa'}
+                      >
+                        {row.country}
+                      </span>
+                      <span className="font-mono country-row-count">
+                        {formatInteger(row.count)}
+                      </span>
+                    </span>
+                    <span className="bar-track country-row-bar">
+                      <span
+                        className="bar-fill"
+                        style={{
+                          width: `${Math.round((row.count / maxCount) * 100)}%`,
+                        }}
+                      />
+                    </span>
+                  </button>
+                ))}
               </div>
             </article>
           </div>

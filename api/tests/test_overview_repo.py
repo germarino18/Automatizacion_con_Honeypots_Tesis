@@ -117,3 +117,64 @@ async def test_overview_range_filters(conn):
 
     assert data["total_eventos"] == 1
     assert data["ips_unicas"] == 1
+
+
+@pytest.mark.asyncio
+async def test_eventos_por_hora_returns_24_utc_buckets(conn):
+    anchor = datetime(2026, 2, 1, 12, 0, 0, tzinfo=timezone.utc)
+
+    # Dos eventos en dos horas distintas dentro de la ventana de 24h.
+    await insert_event(conn, timestamp=anchor - timedelta(hours=20), src_ip="1.1.1.1")
+    await insert_event(conn, timestamp=anchor - timedelta(hours=20), src_ip="2.2.2.2")
+    await insert_event(conn, timestamp=anchor - timedelta(hours=3), src_ip="3.3.3.3")
+
+    data = await repo.get_overview(conn, None, anchor)
+
+    buckets = data["eventos_por_hora"]
+    assert len(buckets) == 24
+    # Los buckets vienen ordenados ascendentemente y cada uno es una hora UTC.
+    hours = [b["hour"] for b in buckets]
+    for i in range(1, len(hours)):
+        assert hours[i] - hours[i - 1] == timedelta(hours=1)
+    assert hours[0] == anchor.replace(minute=0, second=0, microsecond=0) - timedelta(hours=23)
+    assert hours[-1] == anchor.replace(minute=0, second=0, microsecond=0)
+
+    by_hour = {b["hour"]: b["count"] for b in buckets}
+    # anchor-20h cae en hours[0]+3h; anchor-3h cae en hours[0]+20h.
+    assert by_hour[hours[0] + timedelta(hours=3)] == 2
+    assert by_hour[hours[0] + timedelta(hours=20)] == 1
+    # El resto de los buckets queda en cero.
+    assert sum(by_hour.values()) == 3
+
+
+@pytest.mark.asyncio
+async def test_eventos_por_hora_empty_returns_24_zero_buckets(conn):
+    anchor = datetime(2026, 2, 1, 12, 0, 0, tzinfo=timezone.utc)
+
+    data = await repo.get_overview(conn, None, anchor)
+
+    buckets = data["eventos_por_hora"]
+    assert len(buckets) == 24
+    assert all(b["count"] == 0 for b in buckets)
+
+
+@pytest.mark.asyncio
+async def test_bloqueos_ufw_counts_block_automation_actions(conn):
+    await insert_response(conn, action_type="bloqueo", status="completed")
+    await insert_response(conn, action_type="bloqueo", status="completed")
+    await insert_response(conn, action_type="alerta", status="completed")
+    await insert_response(conn, action_type="bloqueo", status="failed")
+
+    data = await repo.get_overview(conn, None, None)
+
+    assert data["bloqueos_ufw"] == 3
+
+
+@pytest.mark.asyncio
+async def test_full_overview_includes_trend_and_bloqueos_keys(conn):
+    data = await repo.get_overview(conn, None, None)
+
+    assert "eventos_por_hora" in data
+    assert "bloqueos_ufw" in data
+    assert isinstance(data["bloqueos_ufw"], int)
+    assert isinstance(data["eventos_por_hora"], list)

@@ -1,10 +1,13 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
 import EmptyState from '../../components/EmptyState';
 import SeverityBadge from '../../components/SeverityBadge';
+import EventDetailDrawer from '../events-explorer/EventDetailDrawer';
 import type { EventItem } from '../../lib/api';
 import { formatTimestamp } from '../../lib/formatters';
 import type { LiveConnection } from './liveFeed';
+import { MAX_LIVE_EVENTS } from './liveFeed';
+import { THREAT_TONE_LABEL, threatSeverityTone } from './threatSeverity';
 import { useLiveEvents } from './useLiveEvents';
 
 const STATUS_LABEL: Record<LiveConnection, string> = {
@@ -13,25 +16,32 @@ const STATUS_LABEL: Record<LiveConnection, string> = {
   offline: 'Sin conexión',
 };
 
-function AmenazaActiva({ event }: { event: EventItem }) {
+interface AmenazaActivaProps {
+  event: EventItem;
+  onInvestigar: (eventId: number) => void;
+}
+
+function AmenazaActiva({ event, onInvestigar }: AmenazaActivaProps) {
+  const tone = threatSeverityTone(event.severity);
+  const suffix = THREAT_TONE_LABEL[tone];
+  const label = suffix ? `Amenaza activa · severidad ${suffix}` : 'Amenaza activa';
   return (
-    <article
-      className={`card threat-panel${event.severity === 'critical' ? '' : ' high'}`}
-    >
-      <h2 className="threat-panel-title">
-        Amenaza activa — severidad{' '}
-        {event.severity === 'critical' ? 'crítica' : 'alta'}
-      </h2>
-      <div className="threat-panel-body">
-        <SeverityBadge severity={event.severity} />
-        <span className="font-mono">{event.src_ip}</span>
-        <span>{event.source_honeypot}</span>
-        <span className="font-mono cell-muted">
-          {event.att_ck_technique ?? '—'}
-        </span>
-        <span className="font-mono cell-muted">
-          {formatTimestamp(event.timestamp)}
-        </span>
+    <article className={`threat-card tone-${tone}`}>
+      <span className="hero-scanline" aria-hidden="true" />
+      <p className="threat-card-label">{label}</p>
+      <div className="threat-card-main">
+        <span className="threat-card-ip">{event.src_ip}</span>
+        <span className="threat-card-hp">{event.source_honeypot}</span>
+        <span className="threat-card-tech">{event.att_ck_technique ?? '—'}</span>
+        <span className="threat-card-ts">{formatTimestamp(event.timestamp)}</span>
+        <span className="threat-card-spacer" aria-hidden="true" />
+        <button
+          type="button"
+          className="btn btn--primary"
+          onClick={() => onInvestigar(event.id)}
+        >
+          Investigar
+        </button>
       </div>
     </article>
   );
@@ -74,8 +84,51 @@ function FeedTabla({ events }: { events: EventItem[] }) {
   );
 }
 
+function FeedChips({
+  status,
+  eventsPerSecond,
+  count,
+  paused,
+  onTogglePause,
+}: {
+  status: LiveConnection;
+  eventsPerSecond: number;
+  count: number;
+  paused: boolean;
+  onTogglePause: () => void;
+}) {
+  return (
+    <div className="live-toolbar">
+      <span className="live-chip">
+        <span className={`status-dot ${status}`} aria-hidden="true" />
+        {STATUS_LABEL[status]}
+      </span>
+      <span className="live-chip live-eps" title="Eventos por segundo (ventana de 10s)">
+        {eventsPerSecond.toFixed(1)} ev/s
+      </span>
+      <span
+        className="live-chip"
+        title="Eventos acumulados sobre la ventana deslizante"
+      >
+        {count}/{MAX_LIVE_EVENTS} en ventana
+      </span>
+      <span className="live-space" />
+      <button
+        type="button"
+        className="btn btn--ghost"
+        aria-pressed={paused}
+        onClick={onTogglePause}
+      >
+        {paused ? 'Reanudar' : 'Pausar'}
+      </button>
+    </div>
+  );
+}
+
 export default function AtaquesEnVivo() {
-  const { events, status, eventsPerSecond } = useLiveEvents();
+  const [paused, setPaused] = useState(false);
+  const { events, status, eventsPerSecond } = useLiveEvents({ paused });
+  const [selectedId, setSelectedId] = useState<number | null>(null);
 
   const amenazaActiva = useMemo(
     () =>
@@ -92,18 +145,13 @@ export default function AtaquesEnVivo() {
         Feed de eventos en tiempo real por SSE con degradación a polling.
       </p>
 
-      <div className="live-toolbar">
-        <span className="live-indicator">
-          <span
-            className={`status-dot ${status}`}
-            aria-hidden="true"
-          />
-          {STATUS_LABEL[status]}
-        </span>
-        <span className="live-eps" title="Eventos por segundo (ventana de 10s)">
-          {eventsPerSecond.toFixed(1)} ev/s
-        </span>
-      </div>
+      <FeedChips
+        status={status}
+        eventsPerSecond={eventsPerSecond}
+        count={events.length}
+        paused={paused}
+        onTogglePause={() => setPaused((value) => !value)}
+      />
 
       {status === 'polling' ? (
         <div className="live-banner warning">
@@ -116,7 +164,12 @@ export default function AtaquesEnVivo() {
         </div>
       ) : null}
 
-      {amenazaActiva ? <AmenazaActiva event={amenazaActiva} /> : null}
+      {amenazaActiva ? (
+        <AmenazaActiva
+          event={amenazaActiva}
+          onInvestigar={(eventId) => setSelectedId(eventId)}
+        />
+      ) : null}
 
       <div className="card panel">
         {events.length === 0 ? (
@@ -132,6 +185,11 @@ export default function AtaquesEnVivo() {
           <FeedTabla events={events} />
         )}
       </div>
+
+      <EventDetailDrawer
+        eventId={selectedId}
+        onClose={() => setSelectedId(null)}
+      />
     </section>
   );
 }

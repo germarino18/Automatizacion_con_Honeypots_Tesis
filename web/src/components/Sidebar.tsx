@@ -1,8 +1,16 @@
+import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 
 import type { ReactNode } from 'react';
 
+import { useAuth } from '../features/auth/AuthContext';
 import { useServicesHealth } from '../lib/useHealth';
+import {
+  sidebarRailClass,
+  sidebarToggleLabel,
+  toggleSidebarMode,
+  type SidebarMode,
+} from './sidebarState';
 
 interface NavItem {
   to: string;
@@ -87,12 +95,19 @@ const NAV_ITEMS: NavItem[] = [
   },
 ];
 
+/** Escudo de la marca con el gradiente v3 (#38449e → #141733). */
 function BrandMark() {
   return (
     <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true">
+      <defs>
+        <linearGradient id="brand-shield-grad" x1="1" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#38449e" />
+          <stop offset="100%" stopColor="#141733" />
+        </linearGradient>
+      </defs>
       <path
         d="M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5l8-3z"
-        fill="var(--accent-soft)"
+        fill="url(#brand-shield-grad)"
         stroke="currentColor"
         strokeWidth="1.5"
       />
@@ -136,15 +151,19 @@ function ServiceStatus() {
   }
 
   return (
-    <div className="sidebar-footer">
+    <div className="sidebar-services">
       <p className="sidebar-services-title">Servicios</p>
       {services.map((service) => (
-        <div className="service-status" key={service.key}>
+        <div
+          className="service-status"
+          key={service.key}
+          title={`${service.label} — ${statusLabel(service.status)}`}
+        >
           <span
             className={`status-dot ${service.status}`}
             title={statusLabel(service.status)}
           />
-          <span>{service.label}</span>
+          <span className="service-label">{service.label}</span>
         </div>
       ))}
     </div>
@@ -152,19 +171,30 @@ function ServiceStatus() {
 }
 
 export default function Sidebar() {
+  const { isAuthenticated, status, logout } = useAuth();
+  const [mode, setMode] = useState<SidebarMode>('expanded');
+
   return (
-    <aside className="sidebar">
-      <div className="sidebar-brand">
+    <aside className={`sidebar${sidebarRailClass(mode)}`}>
+      <button
+        type="button"
+        className="sidebar-brand"
+        onClick={() => setMode((current) => toggleSidebarMode(current))}
+        aria-expanded={mode === 'expanded'}
+        aria-label={sidebarToggleLabel(mode)}
+        title={sidebarToggleLabel(mode)}
+      >
         <span className="sidebar-brand-icon">
           <BrandMark />
         </span>
-        <div>
-          <div className="sidebar-brand-name">Honeypot SOC</div>
-          <div className="sidebar-brand-tagline">Threat Intelligence</div>
-        </div>
-      </div>
+        <span className="sidebar-brand-text">
+          <span className="sidebar-brand-name">HONEYPOT SOC</span>
+          <span className="sidebar-brand-tagline">threat ops</span>
+        </span>
+      </button>
 
       <nav className="sidebar-nav" aria-label="Navegación principal">
+        <h2 className="sidebar-section-title">Operación</h2>
         {NAV_ITEMS.map((item) => (
           <NavLink
             key={item.to}
@@ -181,7 +211,25 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      <ServiceStatus />
+      <div className="sidebar-footer">
+        <ServiceStatus />
+        <button
+          type="button"
+          className="btn btn--tint-danger sidebar-logout"
+          disabled={!isAuthenticated || status === 'probing'}
+          title={
+            isAuthenticated
+              ? 'Cerrar la sesión actual'
+              : 'Inicia sesión para cerrar sesión'
+          }
+          onClick={() => {
+            void logout();
+          }}
+        >
+          <Icon path="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+          <span className="sidebar-logout-label">Cerrar sesión</span>
+        </button>
+      </div>
     </aside>
   );
 }

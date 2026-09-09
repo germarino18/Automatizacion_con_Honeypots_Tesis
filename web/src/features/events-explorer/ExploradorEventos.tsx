@@ -86,7 +86,7 @@ export default function ExploradorEventos() {
           ) : null}
           <button
             type="button"
-            className="btn btn--ghost"
+            className="btn btn--primary"
             disabled={exporting || total === 0}
             onClick={() => {
               void handleExport();

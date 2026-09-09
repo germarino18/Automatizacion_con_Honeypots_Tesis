@@ -155,6 +155,11 @@ export interface CriticalAlert {
   severity: Severity;
 }
 
+export interface HourlyBucket {
+  hour: string;
+  count: number;
+}
+
 export interface Overview {
   total_eventos: number;
   ips_unicas: number;
@@ -164,6 +169,8 @@ export interface Overview {
   total_malware: number;
   mttd_seconds?: number | null;
   mttr_seconds?: number | null;
+  eventos_por_hora?: HourlyBucket[];
+  bloqueos_ufw?: number;
 }
 
 export interface EventFilters {
