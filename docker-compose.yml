@@ -41,11 +41,11 @@ services:
       - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD}
       - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
       - WEBHOOK_URL=${WEBHOOK_URL}
-      # Tokens GLPI (workflow webhook-glpi-ticket; referenciados por {{ $env.* }})
-      - GLPI_APP_TOKEN=${GLPI_APP_TOKEN}
-      - GLPI_USER_TOKEN=${GLPI_USER_TOKEN}
-      # Permite `{{ $env.* }}` en expresiones de nodos (requerido por D-glpi-3)
-      - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
+      # M-04 dual-source: los tokens GLPI NO viven en la env de n8n.
+      # App-Token se guarda en el credential store (httpHeaderAuth GLPI_App_Token);
+      # user_token llega como $json desde el endpoint /tokens del firewall-agent.
+      # Bloquea {{ $env.* }} en expresiones de nodos (requerido por M-04).
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=true
       # Base de datos (PostgreSQL como backend)
       - DB_TYPE=postgresdb
       - DB_POSTGRESDB_HOST=postgres
@@ -203,6 +203,11 @@ services:
     network_mode: host
     cap_add:
       - NET_ADMIN
+    environment:
+      # M-04: el agente provee los tokens GLPI al workflow webhook-glpi-ticket
+      # vía GET /tokens (consumidos como $json en n8n; sin $env.* en expresiones).
+      - GLPI_APP_TOKEN=${GLPI_APP_TOKEN}
+      - GLPI_USER_TOKEN=${GLPI_USER_TOKEN}
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8099/health || exit 1"]

@@ -18,22 +18,30 @@
     },
     {
       "parameters": {
+        "method": "GET",
+        "url": "http://172.21.0.1:8099/tokens",
+        "authentication": "none",
+        "options": {}
+      },
+      "id": "http-get-tokens",
+      "name": "Obtener Tokens GLPI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [450, 300],
+      "notes": "M-04: consume GET /tokens del firewall-agent (host network). Los tokens llegan como $json que SÍ resuelve en parámetros del nodo HTTP (a diferencia de $credentials en parámetros)."
+    },
+    {
+      "parameters": {
         "method": "POST",
         "url": "http://glpi/apirest.php/initSession",
-        "sendHeaders": true,
-        "headerParameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
           "parameters": [
             {
-              "name": "Content-Type",
-              "value": "application/json"
-            },
-            {
-              "name": "App-Token",
-              "value": "={{ $env.GLPI_APP_TOKEN }}"
-            },
-            {
-              "name": "Authorization",
-              "value": "=user_token {{ $env.GLPI_USER_TOKEN }}"
+              "name": "user_token",
+              "value": "={{ $json.user_token }}"
             }
           ]
         },
@@ -46,7 +54,14 @@
       "name": "Init Session",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
-      "position": [450, 300],
+      "position": [650, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "FNUgef96fMx8A0N5",
+          "name": "GLPI_App_Token"
+        }
+      },
+      "notes": "M-04: httpHeaderAuth GLPI_App_Token auto-inyecta header App-Token; user_token llega como $json desde Obtener Tokens GLPI. Sin $env.* ni literales.",
       "onError": "continueRegularOutput"
     },
     {
@@ -65,12 +80,14 @@
       "name": "Session Iniciada?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [650, 300]
+      "position": [850, 300]
     },
     {
       "parameters": {
         "method": "POST",
         "url": "http://glpi/apirest.php/Ticket",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -79,41 +96,42 @@
               "value": "application/json"
             },
             {
-              "name": "App-Token",
-              "value": "={{ $env.GLPI_APP_TOKEN }}"
-            },
-            {
               "name": "Session-Token",
-              "value": "={{ $('Init Session').item.json.session_token }}"
+              "value": "={{ $('Init Session').first().json.session_token }}"
             }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ input: { name: $('Webhook Ticket').item.json.body.name, content: $('Webhook Ticket').item.json.body.content, urgency: (() => { const u = $('Webhook Ticket').item.json.body.urgency; return ({ low: 2, medium: 3, high: 4, critical: 5 })[u] || (u && !isNaN(+u) && +u >= 1 && +u <= 5 ? +u : 3); })(), type: 1, requesttypes_id: 1, impact: $('Webhook Ticket').item.json.body.urgency === 'critical' ? 5 : 3 } }) }}",
+        "jsonBody": "={{ JSON.stringify({ input: { name: $('Webhook Ticket').first().json.body.name, content: $('Webhook Ticket').first().json.body.content, urgency: (() => { const u = $('Webhook Ticket').first().json.body.urgency; return ({ low: 2, medium: 3, high: 4, critical: 5 })[u] || (u && !isNaN(+u) && +u >= 1 && +u <= 5 ? +u : 3); })(), type: 1, requesttypes_id: 1, impact: $('Webhook Ticket').first().json.body.urgency === 'critical' ? 5 : 3 } }) }}",
         "options": {}
       },
       "id": "http-create-ticket",
       "name": "Create Ticket",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
-      "position": [850, 200],
+      "position": [1050, 200],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "FNUgef96fMx8A0N5",
+          "name": "GLPI_App_Token"
+        }
+      },
+      "notes": "M-04: httpHeaderAuth GLPI_App_Token auto-inyecta header App-Token; Session-Token llega como $json desde Init Session. Sin $env.* ni literales.",
       "onError": "continueRegularOutput"
     },
     {
       "parameters": {
         "method": "GET",
         "url": "http://glpi/apirest.php/killSession",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
-              "name": "App-Token",
-              "value": "={{ $env.GLPI_APP_TOKEN }}"
-            },
-            {
               "name": "Session-Token",
-              "value": "={{ $('Init Session').item.json.session_token }}"
+              "value": "={{ $('Init Session').first().json.session_token }}"
             }
           ]
         },
@@ -123,7 +141,14 @@
       "name": "Kill Session",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
-      "position": [1050, 200],
+      "position": [1250, 200],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "FNUgef96fMx8A0N5",
+          "name": "GLPI_App_Token"
+        }
+      },
+      "notes": "M-04: httpHeaderAuth GLPI_App_Token auto-inyecta header App-Token; Session-Token como $json desde Init Session. Sin $env.* ni literales.",
       "onError": "continueRegularOutput"
     },
     {
@@ -136,7 +161,7 @@
       "name": "Normalizar Estado",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1250, 300],
+      "position": [1450, 300],
       "onError": "continueRegularOutput"
     },
     {
@@ -155,7 +180,7 @@
       "name": "Ticket Creado?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [1450, 300]
+      "position": [1650, 300]
     },
     {
       "parameters": {
@@ -169,7 +194,7 @@
       "name": "Crear Ticket",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2,
-      "position": [1700, 200],
+      "position": [1900, 200],
       "onError": "continueRegularOutput",
       "credentials": {
         "postgres": {
@@ -190,7 +215,7 @@
       "name": "Registrar Error",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2,
-      "position": [1700, 420],
+      "position": [1900, 420],
       "onError": "continueRegularOutput",
       "credentials": {
         "postgres": {
@@ -211,7 +236,7 @@
       "name": "Responder",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [1950, 200]
+      "position": [2150, 200]
     },
     {
       "parameters": {
@@ -225,11 +250,22 @@
       "name": "Responder Error",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [1950, 420]
+      "position": [2150, 420]
     }
   ],
   "connections": {
     "Webhook Ticket": {
+      "main": [
+        [
+          {
+            "node": "Obtener Tokens GLPI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Obtener Tokens GLPI": {
       "main": [
         [
           {

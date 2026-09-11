@@ -201,7 +201,7 @@ curl -X POST "http://127.0.0.1:8081/apirest.php/initSession" \
   -d '{}'
 ```
 
-> **Dentro de los contenedores**, n8n llama a GLPI por la DNS de la red Compose: `http://glpi/apirest.php` (nunca `127.0.0.1:8081`). El workflow `workflows/webhook-glpi-ticket.json` consume los tokens por entorno (`{{ $env.GLPI_APP_TOKEN }}`, `{{ $env.GLPI_USER_TOKEN }}`); para eso el servicio `n8n` define `N8N_BLOCK_ENV_ACCESS_IN_NODE=false`.
+> **Dentro de los contenedores**, n8n llama a GLPI por la DNS de la red Compose: `http://glpi/apirest.php` (nunca `127.0.0.1:8081`). **Arquitectura dual-source (M-04, verificada con E2E ticket #14)**: el App-Token vive en el credential store de n8n (`GLPI_App_Token`, `httpHeaderAuth` → n8n auto-inyecta el header `App-Token`); el `user_token` NO es literal ni `$env.*`: el workflow llama a `GET /tokens` del **firewall-agent** (`http://172.21.0.1:8099/tokens`), que lee `GLPI_USER_TOKEN` de su propia env y lo devuelve como JSON para propagarlo como `$json` en los nodos HTTP (Init Session / Create Ticket / Kill Session). `N8N_BLOCK_ENV_ACCESS_IN_NODE=true` impide acceso a `$env.*` desde nodos.
 
 ### Variables de entorno GLPI
 
@@ -214,8 +214,8 @@ curl -X POST "http://127.0.0.1:8081/apirest.php/initSession" \
 | `GLPI_DB_PASSWORD`       | Servicio `glpi` y bootstrap de `glpi-db` (`MYSQL_PASSWORD`)          | *(secreta)*      |
 | `GLPI_DB_ROOT_PASSWORD`  | Password root del MySQL dedicado (solo admin interno de `glpi-db`; no la consume GLPI) | *(secreta)* |
 | `GLPI_PORT`              | Bind `127.0.0.1:${GLPI_PORT}:80` de `glpi`. 8080 choca con `DIONAEA_HTTP_PORT` → usar 8081 | `8081` |
-| `GLPI_APP_TOKEN`         | Workflow n8n `{{ $env.GLPI_APP_TOKEN }}` (App-Token de la REST API)  | `CHANGEME_tras_configuracion_glpi_grupo2` |
-| `GLPI_USER_TOKEN`        | Workflow n8n `{{ $env.GLPI_USER_TOKEN }}` (`user_token` del usuario API) | `CHANGEME_tras_configuracion_glpi_grupo2` |
+| `GLPI_APP_TOKEN`         | Credential store n8n `GLPI_App_Token` (`httpHeaderAuth`, header `App-Token`) + env del servicio `firewall-agent` (expuesto por `GET /tokens`) | `CHANGEME_tras_configuracion_glpi_grupo2` |
+| `GLPI_USER_TOKEN`        | Únicamente env del servicio `firewall-agent` (`GET /tokens` → `$json.user_token` en el workflow); **no** se versiona literal | `CHANGEME_tras_configuracion_glpi_grupo2` |
 
 ### Comportamiento de la auditoría de errores (hallazgo de tesis)
 

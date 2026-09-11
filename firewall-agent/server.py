@@ -7,6 +7,7 @@ sobre la cadena DOCKER-USER de iptables (netns del host de Docker).
 
 Endpoints:
   GET  /health               -> estado del servicio y de la cadena
+  GET  /tokens               -> provee app_token/user_token de GLPI (sin exponer $env en n8n)
   POST /block                -> inserta DROP para una IP (con auto-expiración)
   POST /unblock              -> elimina las reglas DROP de una IP
   GET  /rules                -> lista las reglas DROP activas
@@ -21,6 +22,7 @@ El bloqueo se auto-expira transcurrido `duration` segundos.
 """
 import ipaddress
 import json
+import os
 import re
 import shlex
 import subprocess
@@ -162,6 +164,14 @@ class Handler(BaseHTTPRequestHandler):
             _, out, err = _iptables("127.0.0.1", "-S", CHAIN)
             rules = [l for l in out.splitlines() if l.startswith("-A") and "-j DROP" in l]
             self._json(200, {"chain": CHAIN, "rules": rules, "count": len(rules), "stderr": err or None})
+            return
+        if self.path == "/tokens":
+            # M-04: expone los tokens GLPI al workflow webhook-glpi-ticket (red interna).
+            # El workflow los consume como $json; evita $env.* en expresiones de n8n.
+            self._json(200, {
+                "app_token": os.environ.get("GLPI_APP_TOKEN", ""),
+                "user_token": os.environ.get("GLPI_USER_TOKEN", ""),
+            })
             return
         self._json(404, {"error": "not found"})
 
