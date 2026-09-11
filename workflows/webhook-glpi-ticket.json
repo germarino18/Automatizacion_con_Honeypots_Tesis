@@ -90,7 +90,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ input: { name: $('Webhook Ticket').item.json.body.name, content: $('Webhook Ticket').item.json.body.content, urgency: ({ low: 2, medium: 3, high: 4 })[$('Webhook Ticket').item.json.body.urgency] || 3, type: 1, requesttypes_id: 1, impact: 3 } }) }}",
+        "jsonBody": "={{ JSON.stringify({ input: { name: $('Webhook Ticket').item.json.body.name, content: $('Webhook Ticket').item.json.body.content, urgency: (() => { const u = $('Webhook Ticket').item.json.body.urgency; return ({ low: 2, medium: 3, high: 4, critical: 5 })[u] || (u && !isNaN(+u) && +u >= 1 && +u <= 5 ? +u : 3); })(), type: 1, requesttypes_id: 1, impact: $('Webhook Ticket').item.json.body.urgency === 'critical' ? 5 : 3 } }) }}",
         "options": {}
       },
       "id": "http-create-ticket",

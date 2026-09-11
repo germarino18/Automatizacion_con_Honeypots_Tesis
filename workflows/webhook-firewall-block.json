@@ -19,17 +19,88 @@
     },
     {
       "parameters": {
-        "operation": "executeQuery",
-        "query": "INSERT INTO responses (event_id, action_type, actor, status, details)\nVALUES ($1, 'bloqueo', 'n8n-automated', 'completed',\n  jsonb_build_object(\n    'ip', $2,\n    'duration', $3,\n    'reason', $4,\n    'executed_at', now()::text\n  )\n)\nRETURNING id, timestamp",
+        "method": "POST",
+        "url": "http://172.21.0.1:8099/block",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "ip",
+              "value": "={{ $json.body[\"ip\"] }}"
+            },
+            {
+              "name": "duration",
+              "value": "={{ $json.body[\"duration\"] }}"
+            },
+            {
+              "name": "reason",
+              "value": "={{ $json.body[\"reason\"] }}"
+            }
+          ]
+        },
         "options": {
-          "queryReplacement": "={{ $json.body[\"event_id\"] || null }},={{ $json.body[\"ip\"] }},={{ $json.body[\"duration\"] }},={{ $json.body[\"reason\"] }}"
+          "timeout": 15000
+        }
+      },
+      "id": "http-firewall-agent",
+      "name": "Bloqueo Real (Firewall Agent)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [450, 300],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json[\"applied\"] }}",
+              "operation": "equal",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "if-blocked",
+      "name": "¿Bloqueo Aplicado?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO responses (event_id, action_type, actor, status, details)\nVALUES ($1, 'bloqueo', 'n8n-automated', 'completed',\n  jsonb_build_object(\n    'ip', $2,\n    'duration', $3,\n    'reason', $4,\n    'rule', $5,\n    'executed_at', now()::text\n  )\n)\nRETURNING id, timestamp",
+        "options": {
+          "queryReplacement": "={{ $('Webhook Block').first().json.body[\"event_id\"] || null }},={{ $('Webhook Block').first().json.body[\"ip\"] }},={{ $('Webhook Block').first().json.body[\"duration\"] }},={{ $('Webhook Block').first().json.body[\"reason\"] }},={{ $json[\"rule\"] }}"
         }
       },
       "id": "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c",
       "name": "Registrar Bloqueo",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2,
-      "position": [450, 300],
+      "position": [850, 200],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "postgres": {
+          "id": "postgres-cred-001",
+          "name": "PostgreSQL_Audit"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO responses (event_id, action_type, actor, status, details)\nVALUES ($1, 'bloqueo', 'n8n-automated', 'error',\n  jsonb_build_object(\n    'ip', $2,\n    'duration', $3,\n    'reason', $4,\n    'error', $5,\n    'executed_at', now()::text\n  )\n)\nRETURNING id, timestamp",
+        "options": {
+          "queryReplacement": "={{ $('Webhook Block').first().json.body[\"event_id\"] || null }},={{ $('Webhook Block').first().json.body[\"ip\"] }},={{ $('Webhook Block').first().json.body[\"duration\"] }},={{ $('Webhook Block').first().json.body[\"reason\"] }},={{ $json[\"error\"] }}"
+        }
+      },
+      "id": "e7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d",
+      "name": "Registrar Error Bloqueo",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [850, 420],
       "onError": "continueRegularOutput",
       "credentials": {
         "postgres": {
@@ -41,7 +112,7 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ JSON.stringify({ success: true, message: \"IP blocked\", action_id: $json.id, timestamp: $json.timestamp }) }}",
+        "responseBody": "={{ JSON.stringify({ success: true, message: \"IP bloqueada\", task: 'firewall-block', applied: true, rule: $('Bloqueo Real (Firewall Agent)').first().json.rule, action_id: $json.id, timestamp: $json.timestamp }) }}",
         "options": {
           "responseCode": 200
         }
@@ -50,7 +121,21 @@
       "name": "Responder",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [650, 300]
+      "position": [1050, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, message: \"No se pudo bloquear la IP\", task: 'firewall-block', applied: false, error: $('Bloqueo Real (Firewall Agent)').first().json.error, action_id: $json.id, timestamp: $json.timestamp }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "b3c4d5e6-f7a8-4b9c-0d1e-2f3a4b5c6d7e",
+      "name": "Responder Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1050, 420]
     }
   ],
   "connections": {
@@ -58,7 +143,36 @@
       "main": [
         [
           {
+            "node": "Bloqueo Real (Firewall Agent)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bloqueo Real (Firewall Agent)": {
+      "main": [
+        [
+          {
+            "node": "¿Bloqueo Aplicado?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Bloqueo Aplicado?": {
+      "main": [
+        [
+          {
             "node": "Registrar Bloqueo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Registrar Error Bloqueo",
             "type": "main",
             "index": 0
           }
@@ -75,6 +189,17 @@
           }
         ]
       ]
+    },
+    "Registrar Error Bloqueo": {
+      "main": [
+        [
+          {
+            "node": "Responder Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
@@ -83,5 +208,5 @@
   },
   "tags": [],
   "pinData": {},
-  "versionId": "1"
+  "versionId": "2"
 }

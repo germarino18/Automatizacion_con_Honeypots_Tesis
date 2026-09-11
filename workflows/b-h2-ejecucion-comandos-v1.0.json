@@ -200,18 +200,12 @@
         1450,
         200
       ],
-      "credentials": {
-        "httpHeaderAuth": {
-          "id": "slack-cred-001",
-          "name": "Slack_API"
-        }
-      },
       "onError": "continueRegularOutput"
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "https://api.your-firewall.com/api/v1/block",
+        "url": "http://n8n:5678/webhook/firewall-block",
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
@@ -226,6 +220,10 @@
             {
               "name": "reason",
               "value": "Malicious command execution - PB-H2"
+            },
+            {
+              "name": "event_id",
+              "value": "={{ $json[\"event_id\"] }}"
             }
           ]
         },
@@ -239,24 +237,30 @@
         1650,
         200
       ],
-      "credentials": {
-        "httpHeaderAuth": {
-          "id": "firewall-cred-001",
-          "name": "Firewall_API"
-        }
-      },
       "onError": "continueRegularOutput"
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "https://your-glpi-instance.com/apirest.php/Ticket",
+        "url": "http://n8n:5678/webhook/glpi-ticket",
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
             {
-              "name": "input",
-              "value": "={\"name\": \"CRÍTICO - Comando Malicioso - {{ $json[\"src_ip\"] }}\", \"content\": \"IP: {{ $json[\"src_ip\"] }}\\nComando: {{ $json[\"commands\"] }}\\nScore: {{ $json[\"risk_score\"] }}\\nVT Detections: {{ $json[\"vt_detections\"] }}\", \"urgency\": \"5\"}"
+              "name": "name",
+              "value": "=CRÍTICO - Comando Malicioso - {{ $json[\"src_ip\"] }}"
+            },
+            {
+              "name": "content",
+              "value": "=IP: {{ $json[\"src_ip\"] }}\nComando: {{ $json[\"commands\"] }}\nScore: {{ $json[\"risk_score\"] }}\nVT Detections: {{ $json[\"vt_detections\"] }}"
+            },
+            {
+              "name": "urgency",
+              "value": "critical"
+            },
+            {
+              "name": "event_id",
+              "value": "={{ $json[\"event_id\"] }}"
             }
           ]
         },
@@ -270,12 +274,6 @@
         1850,
         200
       ],
-      "credentials": {
-        "httpHeaderAuth": {
-          "id": "glpi-cred-001",
-          "name": "GLPI_API"
-        }
-      },
       "onError": "continueRegularOutput"
     },
     {
@@ -305,12 +303,6 @@
         1450,
         400
       ],
-      "credentials": {
-        "httpHeaderAuth": {
-          "id": "slack-cred-001",
-          "name": "Slack_API"
-        }
-      },
       "onError": "continueRegularOutput"
     },
     {
@@ -430,6 +422,16 @@
             "node": "Slack Incidente Crítico",
             "type": "main",
             "index": 0
+          },
+          {
+            "node": "Bloqueo Firewall Inmediato",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Crear Ticket Prioritario",
+            "type": "main",
+            "index": 0
           }
         ],
         [
@@ -443,24 +445,12 @@
     },
     "Slack Incidente Crítico": {
       "main": [
-        [
-          {
-            "node": "Bloqueo Firewall Inmediato",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        []
       ]
     },
     "Bloqueo Firewall Inmediato": {
       "main": [
-        [
-          {
-            "node": "Crear Ticket Prioritario",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        []
       ]
     },
     "Crear Ticket Prioritario": {
