@@ -56,38 +56,52 @@ El control primario del proyecto contra esto es el **bind a loopback** en
 `127.0.0.1:${GRAFANA_PORT:-3000}:3000`, de modo que solo son alcanzables desde la propia
 VM (localmente o vía túnel SSH). Eso ya resuelve la exposición de administración.
 
-### Defensa en profundidad opcional: cadena DOCKER-USER
+### Capa 2 (activa): cadena DOCKER-USER con egress filtering de la DMZ
 
-Como segunda capa (opcional y manual, para no acoplar dos mecanismos distintos ni arriesgar
-la demo ante el tribunal), Docker expone la cadena `DOCKER-USER` justo antes de sus reglas,
-y sí filtra el tráfico DNATeado. Blindar los puertos de administración aunque alguien cambie
-mañana un bind a `0.0.0.0`:
+El tráfico de los contenedores sale por FORWARD, y la cadena `DOCKER-USER` es el último
+lugar donde Docker permite filtrarlo. Aquí se aplica el **egress filtering por subred**:
 
-```bash
-# Interfaz externa de la VM (ajustar si no es la ruta por defecto)
-IFACE_EXT=$(ip route get 1.1.1.1 | awk '{print $5; exit}')
+`firewall/setup-docker-egress.sh` (host Linux de la VM, con `sudo`) y su copia
+`firewall-agent/egress-setup.sh` (se ejecuta en el ARRANQUE del contenedor
+`soc-firewall-agent`, con `network_mode: host` + `NET_ADMIN`). Ambos son la misma lógica,
+**idempotentes** (marcan sus reglas con comentarios `honeypot-soc:egress:*` y las re-crean
+limpias en cada ejecución).
 
-# 1) Permitir el retorno de conexiones ya establecidas
-sudo iptables -I DOCKER-USER -i "$IFACE_EXT" -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+Reglas en orden (crítico):
 
-# 2) Bloquear conexiones NUEVAS desde fuera hacia los puertos de administración
-#    (se usan los puertos CONTENEDOR: n8n=5678, grafana=3000)
-sudo iptables -I DOCKER-USER 2 -i "$IFACE_EXT" -p tcp -m multiport --dports 5678,3000 -j DROP
-```
+| # | Regla | Motivo |
+|---|-------|--------|
+| 1 | `ACCEPT ctstate ESTABLISHED,RELATED` | No romper el retorno de ataques entrantes (honeypot → atacante sale con source DMZ) |
+| 2 | `ACCEPT 172.20.0.0/24 → 172.20.0.0/24` | Acceso del operador host→honeypot (el proxy de Docker Desktop entra desde `172.20.0.1`, dentro de la subred) |
+| 3 | `ACCEPT udp/tcp 53` | DNS de los honeypots |
+| 4 | `ACCEPT tcp 443` hacia ipset `honeypot_api_egress` | Solo las IPs actuales de AbuseIPDB, Shodan, VirusTotal y WhoisFreaks |
+| 5 | `DROP 172.20.0.0/24` | Denegar todo lo demás que intente salir de la DMZ (salvaguarda ética) |
 
-Persistencia entre reinicios (opcional):
+El tráfico entrante externo (atacante → honeypot) tiene source FUERA de `172.20.0.0/24`,
+por lo que no lo tocan: las reglas solo gobiernan el egress de la DMZ.
 
-```bash
-sudo apt install iptables-persistent
-sudo netfilter-persistent save
-```
+Las IPs de las APIs se resuelven fresh en cada arranque e ipset (`honeypot_api_egress`)
+la consolida. Limitación conocida: AbuseIPDB y Shodan están detrás de Cloudflare y rotan
+IPs; si el CDN cambia, reiniciar el contenedor (o re-ejecutar el script) vuelve a resolver.
+
+Persistencia: en Docker Desktop / WSL2 no hay `iptables-persistent` del host, así que la
+persistencia real proviene de que `soc-firewall-agent` re-aplica las reglas en cada
+arranque (verificar con `docker restart soc-firewall-agent` → las 6 líneas `egress`
+vuelven a aparecer sin duplicarse).
 
 Notas:
 
-- El acceso local por loopback y el túnel SSH siguen funcionando: ese tráfico no pasa por
-  FORWARD, luego no le afecta `DOCKER-USER`.
-- Si se borran las reglas: `iptables -L DOCKER-USER --line-numbers` para localizarlas y
-  `iptables -D DOCKER-USER <n>` para eliminarlas.
+- El acceso local por loopback y el túnel SSH siguen funcionando.
+- Rollback del egress: `docker exec soc-firewall-agent iptables -L DOCKER-USER --line-numbers -n`
+  y borrar por número, o `iptables -F DOCKER-USER` (restaura el `RETURN` por defecto de Docker).
+- Verificación en vivo desde un honeypot (cowrie/dionaea no traen curl; usar python3):
+
+```bash
+# Bloqueado (debe dar error de red/timeout)
+docker exec soc-cowrie python3 -c "import urllib.request; urllib.request.urlopen('https://example.com', timeout=8)"
+# Permitido (debe responder, p.ej. HTTP 404 del API sin key)
+docker exec soc-cowrie python3 -c "import urllib.request; urllib.request.urlopen('https://api.abuseipdb.com', timeout=8)"
+```
 
 ## Acceso legítimo tras restringir n8n/Grafana a loopback
 
@@ -105,8 +119,9 @@ Con los binds `127.0.0.1` el investigador conserva tres caminos:
 ## Verificación post-aplicación (en la VM)
 
 ```bash
-sudo bash firewall/setup-ufw.sh          # aplicar
-sudo ufw status verbose                   # debe mostrar "deny (outgoing)" como política
+sudo bash firewall/setup-ufw.sh            # capa 1: UFW host
+sudo bash firewall/setup-docker-egress.sh  # capa 2: DOCKER-USER egress DMZ
+sudo ufw status verbose                    # debe mostrar "deny (outgoing)" como política
 
 # Allowlist OK: estas dos deben funcionar
 dig +short example.com                    # DNS OK
@@ -114,6 +129,9 @@ curl -sI https://www.virustotal.com | head -n 1   # HTTPS OK
 
 # Egress denegado: un puerto arbitrario NO permitido debe fallar (timeout)
 timeout 5 bash -c 'cat < /dev/null > /dev/tcp/93.184.216.34/25' || echo "BLOQUEADO (esperado)"
+
+# La cadena DOCKER-USER debe mostrar las 6 reglas honeypot-soc:egress:*
+sudo iptables -L DOCKER-USER -n -v
 
 # Los puertos del experimento siguen accesibles desde fuera (escanear desde otra máquina)
 nc -zv <IP_DE_LA_VM> 2222                 # Cowrie OK
