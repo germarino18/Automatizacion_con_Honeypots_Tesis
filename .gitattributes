@@ -1,2 +1,8 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Los scripts shell DEBEN quedar como LF en el repo y en el checkout.
+# CRLF en entrypoint.sh rompe el arranque del contenedor Linux de Docker
+# ("exec ./entrypoint.sh: no such file or directory" — kernel busca sh\r).
+# Sin esta regla, un clon limpio en Windows materializa los .sh con CRLF.
+*.sh text eol=lf
