@@ -1,5 +1,5 @@
 {
-  "name": "PB-H1 - Reconocimiento y Escaneo (T1595/T1046)",
+  "name": "PB-H1 - Reconocimiento y Escaneo",
   "active": true,
   "id": "ITqYH4UNwfatkrRS",
   "nodes": [
@@ -242,7 +242,8 @@
         1650,
         400
       ],
-      "onError": "continueRegularOutput"
+      "onError": "continueRegularOutput",
+      "webhookId": "b7898ca1-96d8-4491-8d79-eb3b1c7d3d1a"
     },
     {
       "parameters": {
