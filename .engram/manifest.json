@@ -344,6 +344,14 @@
       "sessions": 2,
       "memories": 5,
       "prompts": 10
+    },
+    {
+      "id": "ff737d5b",
+      "created_by": "navar",
+      "created_at": "2026-09-17T18:55:16Z",
+      "sessions": 0,
+      "memories": 2,
+      "prompts": 1
     }
   ]
 }
