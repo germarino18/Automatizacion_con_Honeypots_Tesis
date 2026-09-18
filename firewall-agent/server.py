@@ -5,12 +5,20 @@ Firewall Agent - Honeypot SOC (Tesis: Automatización con Honeypots)
 Sidecar HTTP minimalista (stdlib) que ejecuta bloqueos REALES de IP
 sobre la cadena DOCKER-USER de iptables (netns del host de Docker).
 
-Endpoints:
+Endpoints (TODOS exigen el header `X-Agent-Secret`):
   GET  /health               -> estado del servicio y de la cadena
-  GET  /tokens               -> provee app_token/user_token de GLPI (sin exponer $env en n8n)
   POST /block                -> inserta DROP para una IP (con auto-expiración)
   POST /unblock              -> elimina las reglas DROP de una IP
   GET  /rules                -> lista las reglas DROP activas
+
+Superficie de red (defensa en profundidad, 3 capas):
+  1. Bind explícito a `AGENT_BIND` (default 127.0.0.1). En docker-compose se
+     fija a la gateway de red_interna (172.21.0.1), que NO existe en la red
+     honeypot_dmz donde viven cowrie/dionaea.
+  2. Regla INPUT del contenedor (egress-setup.sh): acepta 8099 solo desde
+     red_interna y descarta el resto. Necesaria porque una IP local del host
+     se alcanza vía INPUT, no vía DOCKER-USER (FORWARD).
+  3. Autenticación por secreto compartido en este módulo (fail-closed).
 
 Contrato /block:
   { "ip": "1.2.3.4", "duration": 3600, "reason": "Honeypot reconnaissance - PB-H1" }
@@ -20,18 +28,28 @@ Respuesta:
 
 El bloqueo se auto-expira transcurrido `duration` segundos.
 """
+import hmac
 import ipaddress
 import json
 import os
 import re
 import shlex
 import subprocess
+import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-HOST = "0.0.0.0"
-PORT = 8099
+# Bind EXPLÍCITO. Nunca 0.0.0.0: este API ejecuta bloqueos reales de iptables.
+# Default loopback (seguro); docker-compose lo fija a la gateway de red_interna.
+HOST = os.environ.get("AGENT_BIND", "127.0.0.1")
+PORT = int(os.environ.get("AGENT_PORT", "8099"))
+
+# Secreto compartido exigido a TODOS los clientes (n8n). Fail-closed: sin
+# secreto el proceso NO arranca (mejor no servir que servir sin autenticación).
+AGENT_SECRET = os.environ.get("AGENT_SECRET", "")
+AUTH_HEADER = "X-Agent-Secret"
+
 CHAIN = "DOCKER-USER"
 COMMENT_PREFIX = "honeypot-soc:"
 
@@ -149,7 +167,22 @@ class Handler(BaseHTTPRequestHandler):
         except (json.JSONDecodeError, UnicodeDecodeError):
             return {}
 
+    def _authorized(self) -> bool:
+        """Verifica el secreto compartido en tiempo constante.
+
+        Se evalúa ANTES del routing: ningún endpoint (incluido /health) es
+        accesible sin credencial. La comparación es constant-time para no
+        filtrar el secreto por timing.
+        """
+        provided = self.headers.get(AUTH_HEADER) or ""
+        if hmac.compare_digest(provided, AGENT_SECRET):
+            return True
+        self._json(401, {"error": "unauthorized"})
+        return False
+
     def do_GET(self):
+        if not self._authorized():
+            return
         if self.path == "/health":
             ok = _chain_exists()
             payload = {
@@ -165,17 +198,11 @@ class Handler(BaseHTTPRequestHandler):
             rules = [l for l in out.splitlines() if l.startswith("-A") and "-j DROP" in l]
             self._json(200, {"chain": CHAIN, "rules": rules, "count": len(rules), "stderr": err or None})
             return
-        if self.path == "/tokens":
-            # M-04: expone los tokens GLPI al workflow webhook-glpi-ticket (red interna).
-            # El workflow los consume como $json; evita $env.* en expresiones de n8n.
-            self._json(200, {
-                "app_token": os.environ.get("GLPI_APP_TOKEN", ""),
-                "user_token": os.environ.get("GLPI_USER_TOKEN", ""),
-            })
-            return
         self._json(404, {"error": "not found"})
 
     def do_POST(self):
+        if not self._authorized():
+            return
         if self.path != "/block" and self.path != "/unblock":
             self._json(404, {"error": "not found"})
             return
@@ -225,8 +252,16 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
+    if not AGENT_SECRET:
+        print(
+            "FATAL: AGENT_SECRET no está definido. El agente no arranca sin "
+            "autenticación (fail-closed). Definilo en .env.",
+            file=sys.stderr,
+            flush=True,
+        )
+        sys.exit(1)
     server = ThreadingHTTPServer((HOST, PORT), Handler)
-    print(f"firewall-agent listening on {HOST}:{PORT}", flush=True)
+    print(f"firewall-agent listening on {HOST}:{PORT} (auth: header {AUTH_HEADER})", flush=True)
     server.serve_forever()
 
 

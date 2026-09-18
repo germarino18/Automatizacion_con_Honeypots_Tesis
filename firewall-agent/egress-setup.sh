@@ -85,3 +85,74 @@ iptables -w -I "$CHAIN" 1 -m conntrack --ctstate ESTABLISHED,RELATED -m comment 
 
 echo "[egress] reglas DOCKER-USER aplicadas:"
 iptables -w -L "$CHAIN" -n -v
+
+# ------------------------------------------------------------
+# 4) API del agente: filtrado en INPUT (capa crítica)
+#
+# POR QUÉ EN INPUT Y NO EN DOCKER-USER:
+#   El agente escucha en 172.21.0.1 = puerta de enlace de red_interna, que
+#   es una IP LOCAL del host. El tráfico dirigido a una IP local entra por
+#   la cadena INPUT, NO por FORWARD. DOCKER-USER solo ve FORWARD, así que
+#   las reglas de egress de más arriba NO protegen este puerto: sin la
+#   regla de abajo, un contenedor de honeypot_dmz (cowrie/dionaea) puede
+#   alcanzar el API del agente. Verificado empíricamente.
+#
+# POR QUÉ POR SUBRED Y NO POR INTERFAZ:
+#   El nombre del bridge (br-<hash>) depende del ID de la red y CAMBIA si
+#   la red se recrea (docker compose down/up). Una regla con -i br-xxxx
+#   quedaría huérfana en silencio y el puerto expuesto sin que se note.
+#   La subred es estable.
+#
+# Idempotente: igual que las reglas de egress, se borran por número de
+# línea las que llevan la marca y se re-insertan limpias.
+# ------------------------------------------------------------
+AGENT_PORT="${AGENT_PORT:-8099}"
+INTERNAL_SUBNET="${INTERNAL_SUBNET:-172.21.0.0/24}"
+MARK_IN="honeypot-soc:api-in"
+
+iptables -w -L INPUT --line-numbers -n | grep -- "$MARK_IN" | awk '{print $1}' | sort -rn | while read -r num; do
+  iptables -w -D INPUT "$num" 2>/dev/null || true
+done || true
+
+# Orden final deseado (de arriba hacia abajo):
+#   1) ACCEPT  -i lo                        (host local: healthcheck del contenedor)
+#   2) ACCEPT  -s red_interna               (n8n -> API)
+#   3) DROP    todo el resto del puerto     (incluye honeypot_dmz: cowrie/dionaea)
+#
+# Se inserta SIEMPRE en el índice 1, de abajo hacia arriba: con la cadena
+# INPUT vacía cualquier otro índice falla con "Index of insertion too big"
+# (INPUT arranca sin reglas, a diferencia de DOCKER-USER). Insertar en
+# índice 2 abortaba el script bajo `set -e`, el contenedor entraba en
+# restart loop y el agente quedaba caído: peor que el problema que resolvía.
+#
+# POR QUÉ HACE FALTA LA REGLA DE `lo` (verificado empíricamente):
+#   El tráfico del propio host hacia una IP LOCAL como 172.21.0.1 se entrega
+#   por la interfaz `lo`, y su dirección de ORIGEN NO es la IP local
+#   esperada: en este entorno (Docker Desktop sobre WSL2) el origen termina
+#   siendo 192.168.65.6 (interfaz `services1` del VM), no 172.21.0.1.
+#   Medido: con -s 172.21.0.0/24, -s 172.21.0.1/32 y -s 127.0.0.1/32 la regla
+#   contó 0 paquetes y la conexión cayó en el DROP; -s 192.168.65.6/32 y
+#   -i lo SÍ la aceptaron. Conclusión: para tráfico host-local el filtro
+#   correcto es la INTERFAZ (`lo`), no la dirección de origen.
+#   Sin esta regla, el healthcheck del contenedor queda en timeout
+#   permanente (agente "unhealthy") y el propio host no puede consultar su API.
+#   Es seguro: `lo` es tráfico exclusivamente local del netns del host; un
+#   contenedor de la DMZ no puede originar tráfico por `lo` (llega por el
+#   bridge de la DMZ), así que sigue cayendo en el DROP.
+#
+# RESILIENCIA: estas reglas son defensa en profundidad (el bind a
+# red_interna y la autenticación por header siguen protegiendo el API si
+# faltan). Un fallo aquí se reporta con fuerza pero NO debe impedir que
+# arranque el servidor: sin agente no hay bloqueo en absoluto.
+api_in_ok=1
+iptables -w -I INPUT 1 -p tcp --dport "$AGENT_PORT" -m comment --comment "$MARK_IN:drop-rest" -j DROP || api_in_ok=0
+iptables -w -I INPUT 1 -p tcp --dport "$AGENT_PORT" -s "$INTERNAL_SUBNET" -m comment --comment "$MARK_IN:allow-internal" -j ACCEPT || api_in_ok=0
+iptables -w -I INPUT 1 -i lo -p tcp --dport "$AGENT_PORT" -m comment --comment "$MARK_IN:allow-localhost" -j ACCEPT || api_in_ok=0
+
+if [ "$api_in_ok" = "1" ]; then
+  echo "[api-in] INPUT filtrado: ${INTERNAL_SUBNET} + lo -> tcp/${AGENT_PORT}; el resto DROP"
+else
+  echo "[api-in] ADVERTENCIA: no se pudieron aplicar todas las reglas de INPUT." >&2
+  echo "[api-in] El API sigue protegido por bind + X-Agent-Secret, pero SIN esta capa de red." >&2
+fi
+iptables -w -L INPUT -n -v

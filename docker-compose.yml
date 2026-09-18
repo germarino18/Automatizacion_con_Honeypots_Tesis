@@ -199,18 +199,30 @@ services:
     build:
       context: ./firewall-agent
     container_name: soc-firewall-agent
-    # Host netns: debe manipular la cadena DOCKER-USER de iptables (regla del host)
+    # Host netns: debe manipular cadenas del host: DOCKER-USER (egress de la DMZ)
+    # e INPUT (API interna). Detalle y justificación en firewall-agent/egress-setup.sh.
     network_mode: host
     cap_add:
       - NET_ADMIN
     environment:
-      # M-04: el agente provee los tokens GLPI al workflow webhook-glpi-ticket
-      # vía GET /tokens (consumidos como $json en n8n; sin $env.* en expresiones).
-      - GLPI_APP_TOKEN=${GLPI_APP_TOKEN}
-      - GLPI_USER_TOKEN=${GLPI_USER_TOKEN}
+      # Bind EXPLÍCITO a la puerta de enlace de red_interna. NUNCA 0.0.0.0:
+      # este API ejecuta bloqueos reales de iptables. 172.21.0.1 no es
+      # alcanzable desde honeypot_dmz (red donde viven cowrie/dionaea).
+      - AGENT_BIND=172.21.0.1
+      - AGENT_PORT=8099
+      # Secreto compartido exigido en el header X-Agent-Secret por TODOS los
+      # endpoints. Fail-closed: sin este valor el agente no arranca.
+      - AGENT_SECRET=${AGENT_SECRET}
+      # Subredes usadas por las reglas del host (egress DMZ + filtrado INPUT del API)
+      - INTERNAL_SUBNET=${NETWORK_INTERNAL_SUBNET}
+      - DMZ_SUBNET=${NETWORK_DMZ_SUBNET}
+      # NOTA: los tokens de GLPI YA NO se inyectan en este contenedor. Viven en
+      # el credential store de n8n y se eliminó el endpoint GET /tokens.
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8099/health || exit 1"]
+      # El healthcheck también se autentica (defensa en profundidad: /health
+      # revela cadena, timestamp y estado del filtrado).
+      test: ["CMD-SHELL", "wget -q --spider --header='X-Agent-Secret: $AGENT_SECRET' http://172.21.0.1:8099/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

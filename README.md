@@ -201,7 +201,7 @@ curl -X POST "http://127.0.0.1:8081/apirest.php/initSession" \
   -d '{}'
 ```
 
-> **Dentro de los contenedores**, n8n llama a GLPI por la DNS de la red Compose: `http://glpi/apirest.php` (nunca `127.0.0.1:8081`). **Arquitectura dual-source (M-04, verificada con E2E ticket #14)**: el App-Token vive en el credential store de n8n (`GLPI_App_Token`, `httpHeaderAuth` → n8n auto-inyecta el header `App-Token`); el `user_token` NO es literal ni `$env.*`: el workflow llama a `GET /tokens` del **firewall-agent** (`http://172.21.0.1:8099/tokens`), que lee `GLPI_USER_TOKEN` de su propia env y lo devuelve como JSON para propagarlo como `$json` en los nodos HTTP (Init Session / Create Ticket / Kill Session). `N8N_BLOCK_ENV_ACCESS_IN_NODE=true` impide acceso a `$env.*` desde nodos.
+> **Dentro de los contenedores**, n8n llama a GLPI por la DNS de la red Compose: `http://glpi/apirest.php` (nunca `127.0.0.1:8081`). **Arquitectura de credenciales (M-04, migrada y verificada con E2E ticket #43)**: ambos tokens viven en el credential store de n8n y ya **no hay ningún endpoint que sirva tokens**. El nodo *Init Session* usa el credential `GLPI_Init_Headers` (`httpCustomAuth`, un único campo `json` con `{"headers": {"App-Token": "...", "Authorization": "user_token ..."}}`), de modo que la sesión se abre con los dos headers en **una sola petición** y el `user_token` **deja de viajar en la query string**; *Create Ticket* y *Kill Session* siguen con `GLPI_App_Token` (`httpHeaderAuth` → header `App-Token`) porque el `Session-Token` es dinámico por ejecución y no puede vivir en un credential. El endpoint `GET /tokens` del **firewall-agent** fue **eliminado**: era un canal de lectura de secretos sin autenticación. `N8N_BLOCK_ENV_ACCESS_IN_NODE=true` impide acceso a `$env.*` desde nodos.
 
 ### Variables de entorno GLPI
 
@@ -214,8 +214,8 @@ curl -X POST "http://127.0.0.1:8081/apirest.php/initSession" \
 | `GLPI_DB_PASSWORD`       | Servicio `glpi` y bootstrap de `glpi-db` (`MYSQL_PASSWORD`)          | *(secreta)*      |
 | `GLPI_DB_ROOT_PASSWORD`  | Password root del MySQL dedicado (solo admin interno de `glpi-db`; no la consume GLPI) | *(secreta)* |
 | `GLPI_PORT`              | Bind `127.0.0.1:${GLPI_PORT}:80` de `glpi`. 8080 choca con `DIONAEA_HTTP_PORT` → usar 8081 | `8081` |
-| `GLPI_APP_TOKEN`         | Credential store n8n `GLPI_App_Token` (`httpHeaderAuth`, header `App-Token`) + env del servicio `firewall-agent` (expuesto por `GET /tokens`) | `CHANGEME_tras_configuracion_glpi_grupo2` |
-| `GLPI_USER_TOKEN`        | Únicamente env del servicio `firewall-agent` (`GET /tokens` → `$json.user_token` en el workflow); **no** se versiona literal | `CHANGEME_tras_configuracion_glpi_grupo2` |
+| `GLPI_APP_TOKEN`         | Credential store n8n: `GLPI_App_Token` (`httpHeaderAuth`, header `App-Token`) y `GLPI_Init_Headers` (`httpCustomAuth`, JSON con `App-Token` + `Authorization`). Ya **no** se inyecta en la env del servicio `firewall-agent` | `CHANGEME_tras_configuracion_glpi_grupo2` |
+| `GLPI_USER_TOKEN`        | Credential store n8n `GLPI_Init_Headers` (dentro del JSON, como `Authorization: user_token ...`); **no** se versiona literal ni lo sirve ningún endpoint | `CHANGEME_tras_configuracion_glpi_grupo2` |
 
 ### Comportamiento de la auditoría de errores (hallazgo de tesis)
 
@@ -308,6 +308,14 @@ N8N_BASIC_AUTH_PASSWORD=cambia-esta-clave-segura
 ---
 
 ## Seguridad
+
+Propiedades **verificadas empíricamente** (probes desde los contenedores, no aspiracionales):
+
+* **Segmentación de red efectiva**: los honeypots (`honeypot_dmz`, `172.20.0.0/24`) no alcanzan la red interna (`red_interna`, `172.21.0.0/24`). Verificado con probes desde `soc-cowrie` y `soc-dionaea` contra `172.21.0.1:8099` (API del agente), `172.20.0.1:8099` y `172.21.0.2:5678` (n8n): **timeout en los 6 casos**. Contraste documentado: bindear el agente a `172.21.0.1` **por sí solo NO aislaba** — al ser una IP local del host, el tráfico entra por `INPUT` y no por `FORWARD`, así que los honeypots obtenían `HTTP 200` antes de añadir el filtro.
+* **API del agente (`firewall-agent`) con tres capas independientes**: (1) bind a `172.21.0.1:8099` (en lugar de `0.0.0.0` + `network_mode: host`), (2) filtro en la cadena `INPUT` que sólo admite `172.21.0.0/24` y `lo` y descarta el resto del puerto, (3) header obligatorio `X-Agent-Secret` comparado con `hmac.compare_digest` en **todos** los endpoints, con arranque *fail-closed* si el secreto no está definido. Verificado: `401` sin header, `401` con header inválido, `200` con el correcto (`POST /block` sin header también `401` y sin crear regla).
+* **Los secretos no se sirven por HTTP**: el endpoint `GET /tokens` del agente (que devolvía el `user_token` de GLPI **sin autenticación**) fue eliminado; los dos tokens de GLPI viven ahora en el credential store de n8n.
+
+Controles preexistentes:
 
 * Contenedores aislados
 * Restricción de tráfico saliente

@@ -40,14 +40,22 @@
         },
         "options": {
           "timeout": 15000
-        }
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
       },
       "id": "http-firewall-agent",
       "name": "Bloqueo Real (Firewall Agent)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
       "position": [450, 300],
-      "onError": "continueRegularOutput"
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "8MQ1ogK0OVBzVDyc",
+          "name": "Firewall_Agent_Secret"
+        }
+      }
     },
     {
       "parameters": {

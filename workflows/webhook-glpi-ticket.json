@@ -18,33 +18,10 @@
     },
     {
       "parameters": {
-        "method": "GET",
-        "url": "http://172.21.0.1:8099/tokens",
-        "authentication": "none",
-        "options": {}
-      },
-      "id": "http-get-tokens",
-      "name": "Obtener Tokens GLPI",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 3,
-      "position": [450, 300],
-      "notes": "M-04: consume GET /tokens del firewall-agent (host network). Los tokens llegan como $json que SÍ resuelve en parámetros del nodo HTTP (a diferencia de $credentials en parámetros)."
-    },
-    {
-      "parameters": {
         "method": "POST",
         "url": "http://glpi/apirest.php/initSession",
         "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            {
-              "name": "user_token",
-              "value": "={{ $json.user_token }}"
-            }
-          ]
-        },
+        "genericAuthType": "httpCustomAuth",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "{}",
@@ -56,12 +33,12 @@
       "typeVersion": 3,
       "position": [650, 300],
       "credentials": {
-        "httpHeaderAuth": {
-          "id": "FNUgef96fMx8A0N5",
-          "name": "GLPI_App_Token"
+        "httpCustomAuth": {
+          "id": "tKxy5en6i33HD2JY",
+          "name": "GLPI_Init_Headers"
         }
       },
-      "notes": "M-04: httpHeaderAuth GLPI_App_Token auto-inyecta header App-Token; user_token llega como $json desde Obtener Tokens GLPI. Sin $env.* ni literales.",
+      "notes": "M-04 (hardening): la credencial httpCustomAuth 'GLPI_Init_Headers' inyecta App-Token + 'Authorization: user_token ...' como HEADERS. Ya no se usa el endpoint GET /tokens del agente (eliminado) ni el user_token en query string.",
       "onError": "continueRegularOutput"
     },
     {
@@ -255,17 +232,6 @@
   ],
   "connections": {
     "Webhook Ticket": {
-      "main": [
-        [
-          {
-            "node": "Obtener Tokens GLPI",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Obtener Tokens GLPI": {
       "main": [
         [
           {
